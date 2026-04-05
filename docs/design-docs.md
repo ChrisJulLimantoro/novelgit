@@ -1,108 +1,115 @@
 ---
 
-# 📘 Design Document: NovelGit (V.2)
-**Project Status:** Initial Architecture | **Target Environment:** Vercel (Next.js) + GitHub API
+# Design document: NovelGit
 
-## 1. Executive Summary
-**NovelGit** is a private, multi-tenant novel management system. It allows a writer to manage multiple literary projects through a single web interface. It uses **GitHub as a Database**, ensuring that all prose is version-controlled, portable, and free to host, while providing a modern, "Zen" web-based writing experience.
+**Project status:** Core product implemented (library, editor, sync, analytics, export). Lore/wiki linking and multi-user auth are not implemented.
 
----
+**Target environment:** Vercel (Next.js) + GitHub Contents API
 
-## 2. System Architecture
-The system follows a **Decoupled Git-CMS** pattern. The website acts as a sophisticated GUI for a GitHub repository.
+## 1. Executive summary
 
-* **Frontend:** Next.js 16 (App Router) for high-performance rendering.
-* **Storage:** A private GitHub Repository containing all manuscripts and configurations.
-* **Write Engine:** **Next.js Server Actions + Octokit**. Edits made on the web are pushed to GitHub via API, which triggers a Vercel redeploy.
-* **Local Access:** The same repository can be opened in **Obsidian** on Ubuntu for offline deep-work.
+**NovelGit** is a private novel management system: a writer manages multiple literary projects through one web UI. **GitHub is the database**—prose and config live in a repository as Markdown and JSON, so work stays version-controlled and portable. The app is a GUI on top of that repo: server actions use **Octokit** to read and write files; **Next.js 16** (App Router) renders the UI.
 
 ---
 
-## 3. Data Schema & File Structure
+## 2. System architecture
 
-### 📂 Repository Structure
+Decoupled **Git-CMS** pattern:
+
+- **Frontend:** Next.js 16 (App Router), React 19, Tailwind v4.
+- **Storage:** A GitHub repository containing manuscripts and configuration.
+- **Write path:** Next.js Server Actions + Octokit (`createOrUpdateFileContents`). Updates use the latest file SHA per request to reduce 409 conflicts.
+- **Local editing:** The same repo can be cloned and edited offline (for example in Obsidian); web sync and local Git workflows coexist with the usual merge/conflict caveats.
+
+**Route groups (implementation):**
+
+- `app/(main)/` — shell with top nav: landing is `app/page.tsx`; library and novel subroutes live under `app/(main)/library/`.
+- `app/(editor)/` — full-height editor layout for `app/(editor)/edit/[novelId]/[chapterSlug]/`.
+
+---
+
+## 3. Data schema and file structure
+
+### Repository layout
+
 ```text
 /config
-  novels.json          <-- The "Library Registry" (Dynamic)
+  novels.json          ← Library registry (source of truth for the dashboard)
 /content
-  /[novel-id]          <-- Folder per project
-    /manuscript        <-- Chapter .md files (01-intro.md, etc.)
-    /lore              <-- Character and world building .md files
-    meta.json          <-- Project-specific settings (Genre, Goals)
+  /[novel-id]
+    /manuscript        ← Chapter .md files (e.g. 01-intro.md)
+    /lore              ← World-building .md (scaffolded; advanced wiki features TBD)
+    meta.json          ← Title, genre, chapterOrder, etc.
+    analytics.json     ← Daily word-count entries for heatmap (written on sync)
 ```
 
-### 📄 `novels.json` (The Library Registry)
-This file is the "Source of Truth" for the dashboard. It is updated via the web UI.
-```json
-{
-  "novels": [
-    {
-      "id": "project-void",
-      "title": "The Void Chronicles",
-      "path": "content/project-void",
-      "status": "writing"
-    }
-  ]
-}
-```
+### `novels.json` (library registry)
+
+Updated via the web UI when creating novels. Shape matches the Zod schema in `types/novel.ts`.
 
 ---
 
-## 4. Key Functional Features
+## 4. Key functional features
 
-### 🏛️ The Library Dashboard
-* **Dynamic Discovery:** Scans `novels.json` to render project cards.
-* **Project Creation:** A "New Novel" button that appends to the JSON and creates the folder structure via GitHub API.
+### Library dashboard
 
-### ✍️ The "Zen" Editor
-* **Markdown Support:** Full GFM (GitHub Flavored Markdown) support.
-* **Auto-save Strategy:** * **Local:** Debounced save to `localStorage` (Instant).
-    * **Cloud:** Manual or event-based "Sync to GitHub" (Triggers Build).
-* **Typography:** Optimized for long-form (Serif, 720px width, high line-height).
+- Reads `config/novels.json` from GitHub and renders project cards.
+- **New Novel** creates folder scaffold and appends the registry entry.
 
-### 🧠 Integrated Wiki (World Bible)
-* **Scoped Lore:** When writing in *Novel A*, the system only suggests/links characters from *Novel A*'s lore folder.
-* **Bidirectional Linking:** Automatically detect `[[Character Name]]` and link to their sheet.
+### Zen editor
 
----
+- Markdown editing (CodeMirror), GFM-oriented reading pane.
+- **Local:** Debounced draft in `localStorage` (see `lib/local-draft.ts`).
+- **Cloud:** Explicit sync commits the chapter file via GitHub API; analytics row appended on sync where implemented.
 
-## 5. Technical Specifications
+### Analytics
 
-### 🛠️ The "Sync" Logic (Server Action)
-To allow "Web-only" updates, the application implements the following flow:
-1.  **Fetch:** Get current file content and `SHA` from GitHub API.
-2.  **Update:** Merge changes and convert to Base64.
-3.  **Commit:** Use `octokit.rest.repos.createOrUpdateFileContents` to push.
-4.  **Revalidate:** Use `revalidatePath` to clear Next.js cache.
+- Per-novel page reads `content/[novelId]/analytics.json` and renders a calendar heatmap (`@nivo/calendar`).
 
-### 🔒 Security & Access
-* **Environment Variables:** `GITHUB_TOKEN` and `GITHUB_REPO` stored securely in Vercel.
-* **Access Control:** Middleware to protect `/edit` and `/admin` routes via a secret key or Auth.
+### Export
+
+- `GET /api/export/[novelId]?format=pdf|docx` — chapters assembled in `meta.json` chapter order.
+
+### Integrated wiki (world bible)
+
+- **Planned:** Scoped lore and `[[wikilinks]]` as described in earlier revisions are **not** implemented yet; `lore/` is created for future use.
 
 ---
 
-## 6. Development Roadmap
+## 5. Technical notes
 
-### Phase 1: Infrastructure (The Foundation)
-- [ ] Initialize Next.js App Router project.
-- [ ] Set up Tailwind CSS with a Serif font stack.
-- [ ] Configure Octokit and verify connection to a private GitHub repo.
+### Sync flow (server actions)
 
-### Phase 2: Library Management (The Hub)
-- [ ] Build the logic to read and update `config/novels.json` via the web.
-- [ ] Create the "Library" landing page.
+1. **Fetch:** `getFile` returns content and `sha` from the GitHub API.
+2. **Update:** Content encoded as Base64 for `createOrUpdateFileContents`.
+3. **Revalidate:** `revalidatePath` for affected routes after successful writes.
 
-### Phase 3: The Writer's Workspace (The Core)
-- [ ] Implement the Markdown editor with file-saving capability.
-- [ ] Add the "Chapter Sidebar" with drag-and-drop reordering logic.
-- [ ] Build the "Reader Mode" for proofreading.
+Always obtain a fresh `sha` with `getFile` immediately before `putFile` in the same action when updating an existing file.
 
-### Phase 4: Polish (The Experience)
-- [ ] Add word count analytics and daily writing heatmaps.
-- [ ] Implement "Export to PDF/Docx" using a server-side library.
+### Security and access
+
+- **Environment:** `GITHUB_TOKEN`, `GITHUB_REPO`, `AUTH_SECRET` (see `.env.example` and README).
+- **Access control:** Middleware matches `/edit/:path*` and `/admin/:path*`. Unauthenticated users are redirected to `/login` with a return URL. The passphrase must equal `AUTH_SECRET`; a cookie is set on success. `/library` and `/` are not protected by this middleware (change if you need a private library).
 
 ---
 
-## 7. Operational Notes
-* **Deployment Lag:** Users must be aware that a "Sync" triggers a ~45s Vercel build. A UI indicator must manage this expectation.
-* **Conflict Resolution:** If editing from multiple devices, the "Web Editor" should always perform a `GET` request for the latest `SHA` before attempting a `PUT` to avoid 409 Conflict errors.
+## 6. Roadmap (maintenance view)
+
+| Area | Status |
+|------|--------|
+| Next.js + Tailwind + Octokit wiring | Done |
+| Library + `novels.json` + novel scaffold | Done |
+| Editor + local draft + GitHub sync + chapter order | Done |
+| Reader / edit toggle in editor | Done |
+| Analytics + heatmap + `analytics.json` on sync | Done |
+| PDF / DOCX export | Done |
+| Passphrase auth for `/edit`, `/admin` | Done |
+| Lore wiki + bidirectional `[[links]]` | Not started |
+| Multi-user auth (e.g. OAuth) | Not started |
+
+---
+
+## 7. Operational notes
+
+- **Deploy latency:** A full site redeploy on Vercel is separate from GitHub file updates via the API; the UI may still warn users that GitHub/Vercel propagation can take time after sync.
+- **Conflicts:** If editing from multiple clients, always refresh from GitHub (or rely on the editor’s load path) before syncing; the server uses the latest SHA when committing.

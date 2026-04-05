@@ -5,6 +5,8 @@
 **Stack:** Next.js 16 (App Router) · Tailwind v4 · React 19 · shadcn/ui (New York style)
 **Companion docs:** `/docs/design-docs.md` (architecture) · `/docs/spec/implementation-plan.md` (phases)
 
+**Repo status:** UI primitives are already present under `components/ui/**` and feature areas under `components/editor/**`, `components/novels/**`, etc. The `npx shadcn@latest init` / `add` steps below are the **original bootstrap instructions** for new clones or when adding components—not a prerequisite on every pull.
+
 ---
 
 ## 1. Library Choices
@@ -13,7 +15,7 @@
 
 shadcn/ui generates source files directly into the repo — no versioned dependency — making it inherently compatible with Tailwind v4.
 
-**Init (run once after Phase 1 CSS setup):**
+**Init (run once when bootstrapping a fresh project or new workstation):**
 ```bash
 npx shadcn@latest init
 # Prompts: TypeScript · New York style · CSS variables · app/globals.css · components/ui alias

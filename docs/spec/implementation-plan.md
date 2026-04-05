@@ -8,6 +8,23 @@
 
 ---
 
+## Current implementation status (snapshot)
+
+This section summarizes what exists in the repo **today** so the phase detail below stays useful as history without contradicting the codebase.
+
+| Phase | Summary |
+|-------|---------|
+| **1 — Infrastructure** | Done: `lib/github.ts`, `lib/config.ts`, `middleware.ts` ( `/edit`, `/admin` ), `app/api/health/route.ts`, Tailwind v4 + app shell. Auth: `/login` + `AUTH_SECRET` cookie. **Note:** `app/page.tsx` is a marketing **hero** (`/`), not a redirect to `/library`. |
+| **2 — Library** | Done: `app/(main)/library/page.tsx`, `app/(main)/library/actions.ts`, `components/novels/*`, `lib/github-content.ts`, `types/novel.ts`. |
+| **3 — Editor** | Done: `app/(editor)/edit/[novelId]/[chapterSlug]/`, CodeMirror client (`components/editor/*`), chapter sidebar + reorder persisting to `meta.json`, reader pane, local draft + sync actions. |
+| **4 — Polish** | Done: `content/.../analytics.json` + heatmap (`app/(main)/library/[novelId]/analytics/page.tsx`), `lib/word-count.ts`, export `app/api/export/[novelId]/route.ts` + `lib/export-pdf.ts` / `lib/export-docx.ts`. |
+
+**Not built (per design-docs):** lore/wiki wikilinks, multi-user OAuth. **`/admin`** is matched by middleware but may have no pages yet—add routes as needed.
+
+Paths in the tables below use older shorthand (`app/library/...`); the live app uses `app/(main)/library/...` and `app/(editor)/edit/...`.
+
+---
+
 ## Prerequisites
 
 Before any phase begins:
@@ -297,33 +314,45 @@ All phases are strictly sequential. Do not start Phase N+1 until Phase N accepta
 
 ---
 
-## File Tree Target State (end of Phase 3)
+## File tree (approximate current state)
 
 ```
 novelgit/
 ├── app/
 │   ├── layout.tsx
-│   ├── page.tsx                          ← redirects to /library
-│   ├── library/
-│   │   ├── page.tsx
-│   │   ├── NewNovelButton.tsx
-│   │   └── actions.ts
-│   └── edit/
-│       └── [novelId]/
-│           ├── ChapterSidebar.tsx
-│           ├── ReaderMode.tsx
-│           └── [chapterSlug]/
-│               ├── page.tsx
-│               ├── EditorClient.tsx
-│               └── actions.ts
+│   ├── page.tsx                          ← landing (hero), not a redirect
+│   ├── login/
+│   ├── api/
+│   │   ├── health/route.ts
+│   │   └── export/[novelId]/route.ts
+│   ├── (main)/
+│   │   ├── layout.tsx                    ← TopNav shell
+│   │   └── library/
+│   │       ├── page.tsx
+│   │       ├── actions.ts
+│   │       └── [novelId]/
+│   │           ├── page.tsx
+│   │           └── analytics/page.tsx
+│   └── (editor)/
+│       ├── layout.tsx
+│       └── edit/[novelId]/[chapterSlug]/
+│           ├── page.tsx
+│           └── actions.ts
+├── components/
+│   ├── editor/                           ← editor-client, chapter-sidebar, reader-pane, …
+│   ├── novels/
+│   └── ui/
 ├── lib/
 │   ├── github.ts
 │   ├── github-content.ts
 │   ├── config.ts
 │   ├── local-draft.ts
-│   └── word-count.ts                     ← added in Phase 4
+│   ├── word-count.ts
+│   ├── export-pdf.ts
+│   └── export-docx.ts
 ├── types/
 │   └── novel.ts
 ├── middleware.ts
-└── .env.local                            ← git-ignored
+├── .env.example                          ← committed template
+└── .env.local                            ← git-ignored secrets
 ```
