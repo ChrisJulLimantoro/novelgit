@@ -12,6 +12,13 @@ export const metadata: Metadata = {
   description: "Your private writing workspace",
 };
 
+// Runs before React loads — reads the saved preference and applies the
+// correct class to <html> immediately, preventing a flash of wrong theme.
+// Because this is a Server Component, React never reconciles this <script>
+// on the client and React 19 will not emit the "Encountered a script tag"
+// warning that fires for <script> elements inside Client Components.
+const themeInitScript = `try{var t=localStorage.getItem('theme')||'system',d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d)}catch(e){}`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
@@ -20,7 +27,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${geistSans.variable} ${geistMono.variable} ${lora.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <ThemeProvider defaultTheme="system">
           {children}
         </ThemeProvider>
       </body>

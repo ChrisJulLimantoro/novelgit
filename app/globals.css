@@ -40,7 +40,7 @@
   --bg-sidebar:  var(--parchment-100);
   --text-primary: var(--parchment-950);
   --text-muted:   var(--parchment-600);
-  --accent: oklch(0.97 0 0);
+  --accent: var(--ink-600);
   --accent-hover: var(--ink-700);
   --border-default: var(--parchment-200);
   --shadow-sm: 0 1px 3px rgb(0 0 0 / 0.06);
@@ -51,6 +51,32 @@
   --status-writing:  #2d7a3a;
   --status-editing:  var(--ink-700);
   --status-complete: #5b2d8a;
+
+  /* Gradient mesh glow */
+  --glow-primary:   rgba(40, 68, 144, 0.18);
+  --glow-secondary: rgba(176, 141, 96, 0.14);
+
+  /* Glassmorphism panels */
+  --glass-bg:     rgba(255, 255, 255, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.7);
+  --glass-shadow: 0 8px 32px rgba(40, 68, 144, 0.10);
+
+  /* Floating nav pill */
+  --nav-float-bg:     rgba(255, 255, 255, 0.70);
+  --nav-float-border: rgba(200, 200, 200, 0.50);
+
+  /* Hero gradient text stops */
+  --hero-gradient-from: var(--ink-700);
+  --hero-gradient-to:   var(--parchment-600);
+
+  /* Status soft fill backgrounds */
+  --status-planning-bg: rgba(126, 92, 55, 0.10);
+  --status-writing-bg:  rgba(45, 122, 58, 0.10);
+  --status-editing-bg:  rgba(30, 51, 112, 0.10);
+  --status-complete-bg: rgba(91, 45, 138, 0.10);
+
+  /* Card hover lift */
+  --shadow-lift: 0 12px 32px rgba(0, 0, 0, 0.12);
 
   /* Layout constants */
   --sidebar-width:           16rem;   /* 256px */
@@ -66,7 +92,7 @@
   --bg-sidebar:   var(--parchment-950);
   --text-primary: var(--parchment-50);
   --text-muted:   var(--parchment-400);
-  --accent: oklch(0.269 0 0);
+  --accent: var(--ink-300);
   --accent-hover: var(--ink-200);
   --border-default: var(--parchment-800);
   --shadow-sm: 0 1px 3px rgb(0 0 0 / 0.3);
@@ -75,6 +101,21 @@
   --status-writing:  #5ec46b;
   --status-editing:  var(--ink-300);
   --status-complete: #a865d4;
+
+  --glow-primary:   rgba(116, 153, 217, 0.22);
+  --glow-secondary: rgba(217, 200, 171, 0.10);
+  --glass-bg:     rgba(31, 21, 12, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --nav-float-bg:     rgba(31, 21, 12, 0.70);
+  --nav-float-border: rgba(255, 255, 255, 0.10);
+  --hero-gradient-from: var(--ink-300);
+  --hero-gradient-to:   var(--parchment-400);
+  --status-planning-bg: rgba(217, 200, 171, 0.10);
+  --status-writing-bg:  rgba(94, 196, 107, 0.10);
+  --status-editing-bg:  rgba(116, 153, 217, 0.10);
+  --status-complete-bg: rgba(168, 101, 212, 0.10);
+  --shadow-lift: 0 12px 32px rgba(0, 0, 0, 0.45);
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -108,7 +149,7 @@
 }
 
 @theme inline {
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-geist-sans);
   --font-mono:  var(--font-geist-mono);
   --font-serif: var(--font-lora), Georgia, Cambria, "Times New Roman", serif;
 
@@ -162,6 +203,18 @@ body {
 @keyframes slideUp {
   from { transform: translateY(100%); opacity: 0; }
   to   { transform: translateY(0);    opacity: 1; }
+}
+
+@keyframes gradientShift {
+  0%,100% { background-position: 0% 50%; }
+  50%     { background-position: 100% 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @layer base {

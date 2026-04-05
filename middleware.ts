@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 export function middleware(request: NextRequest) {
   const token = request.cookies.get("auth_token")?.value;
   if (token !== process.env.AUTH_SECRET) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    const from = request.nextUrl.pathname + request.nextUrl.search;
+    return NextResponse.redirect(new URL(`/login?from=${encodeURIComponent(from)}`, request.url));
   }
   return NextResponse.next();
 }
