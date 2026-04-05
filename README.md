@@ -4,12 +4,12 @@ NovelGit is a web app for managing long-form fiction in a **private GitHub repos
 
 ## Features
 
-- **Landing page** (`/`) — marketing-style hero with links into the app.
-- **Library** (`/library`) — reads `config/novels.json` from the content repo and lists novels; create new novels and scaffold `content/<id>/…` via server actions.
+- **Landing page** (`/`) — marketing hero, then a **private library** gate: users enter the deployment passphrase (`AUTH_SECRET`) to unlock the app. Signed-in users see a short “Go to library” strip after the hero.
+- **Library** (`/library`) — reads `config/novels.json` from the content repo and lists novels; create new novels and scaffold `content/<id>/…` via server actions. **Requires authentication** (same cookie as the editor).
 - **Editor** (`/edit/[novelId]/[chapterSlug]`) — CodeMirror markdown editor, debounced local drafts, sync to GitHub, chapter sidebar with drag-and-drop order stored in `meta.json`, and a read/edit toggle.
 - **Analytics** (`/library/[novelId]/analytics`) — calendar heatmap from `content/<novelId>/analytics.json` (updated on sync).
 - **Export** — `GET /api/export/[novelId]?format=pdf|docx` builds a combined manuscript in chapter order.
-- **Auth** — single-user passphrase (`AUTH_SECRET`); middleware protects `/edit` and `/admin` only. `/library` is public unless you change routing.
+- **Auth** — single-user passphrase (`AUTH_SECRET`); middleware protects **`/library`**, **`/edit`**, **`/admin`**, and **`/api/export/*`**. Unauthenticated visitors only see the public hero; `/login` redirects to the home page sign-in section (`#private-library`).
 
 ## Stack
 
@@ -37,7 +37,7 @@ Create `.env.local` in the project root (see `.env.example`). Vercel (or your ho
 |----------|---------|
 | `GITHUB_TOKEN` | PAT for the content repository |
 | `GITHUB_REPO` | `owner/repo` of the content store |
-| `AUTH_SECRET` | Passphrase for the login cookie; must match what users type on `/login` |
+| `AUTH_SECRET` | Passphrase users type on the home page (after the hero) to unlock the library; stored as an httpOnly cookie when correct |
 
 Optional: `GET /api/health` calls `octokit.rest.repos.get`—use it to verify token and repo name in deployment.
 
@@ -48,7 +48,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Visit `/library` to see the dashboard; open `/edit/...` after signing in at `/login`.
+Open [http://localhost:3000](http://localhost:3000). Scroll past the hero and enter your passphrase (same as `AUTH_SECRET`) to unlock **Library** and **Editor**. Visiting `/library` or `/login` without a session sends you back to the home page with the sign-in form.
 
 ### Scripts
 

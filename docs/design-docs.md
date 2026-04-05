@@ -23,7 +23,8 @@ Decoupled **Git-CMS** pattern:
 
 **Route groups (implementation):**
 
-- `app/(main)/` — shell with top nav: landing is `app/page.tsx`; library and novel subroutes live under `app/(main)/library/`.
+- `app/page.tsx` — public marketing hero, then passphrase form for the **private library** (or a “Go to library” CTA when already signed in).
+- `app/(main)/` — shell with top nav: library and novel subroutes under `app/(main)/library/` (all require auth).
 - `app/(editor)/` — full-height editor layout for `app/(editor)/edit/[novelId]/[chapterSlug]/`.
 
 ---
@@ -89,7 +90,7 @@ Always obtain a fresh `sha` with `getFile` immediately before `putFile` in the s
 ### Security and access
 
 - **Environment:** `GITHUB_TOKEN`, `GITHUB_REPO`, `AUTH_SECRET` (see `.env.example` and README).
-- **Access control:** Middleware matches `/edit/:path*` and `/admin/:path*`. Unauthenticated users are redirected to `/login` with a return URL. The passphrase must equal `AUTH_SECRET`; a cookie is set on success. `/library` and `/` are not protected by this middleware (change if you need a private library).
+- **Access control:** Middleware matches `/library`, `/edit`, `/admin`, and `/api/export/*`. Unauthenticated users are redirected to `/` with `?from=…` pointing at the URL they tried; the home page scrolls to the **Private library** sign-in block (`#private-library`). The passphrase must equal `AUTH_SECRET`; an httpOnly cookie is set on success. The hero and marketing copy on `/` stay public; only the library, editor, and export API require a session. Legacy `/login` redirects to the same home-page sign-in anchor.
 
 ---
 
@@ -103,7 +104,7 @@ Always obtain a fresh `sha` with `getFile` immediately before `putFile` in the s
 | Reader / edit toggle in editor | Done |
 | Analytics + heatmap + `analytics.json` on sync | Done |
 | PDF / DOCX export | Done |
-| Passphrase auth for `/edit`, `/admin` | Done |
+| Passphrase auth for `/library`, `/edit`, `/admin`, `/api/export/*` | Done |
 | Lore wiki + bidirectional `[[links]]` | Not started |
 | Multi-user auth (e.g. OAuth) | Not started |
 

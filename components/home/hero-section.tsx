@@ -5,7 +5,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { ExternalLink } from "lucide-react";
 import { DarkModeToggle } from "@/components/dark-mode-toggle";
 import { Button } from "@/components/ui/button";
-import { copyrightLine, NOVELGIT_GITHUB_URL } from "@/lib/site";
+import { NOVELGIT_GITHUB_URL } from "@/lib/site";
 
 const panels = [
   {
@@ -52,8 +52,13 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: easeOut } },
 };
 
-export function HeroSection() {
+interface HeroSectionProps {
+  isAuthenticated: boolean;
+}
+
+export function HeroSection({ isAuthenticated }: HeroSectionProps) {
   const prefersReduced = useReducedMotion();
+  const libraryHref = isAuthenticated ? "/library" : "/#private-library";
 
   return (
     <div
@@ -103,7 +108,7 @@ export function HeroSection() {
             style={{ background: "var(--border-default)" }}
           />
           <Link
-            href="/library"
+            href={libraryHref}
             className="font-mono text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
           >
             Library
@@ -163,7 +168,7 @@ export function HeroSection() {
                 transition={{ type: "spring", stiffness: 400, damping: 20 }}
                 className="inline-block"
               >
-                <Link href="/library">
+                <Link href={libraryHref}>
                   <Button
                     className="px-8 h-10 text-base rounded-full"
                     style={{
@@ -171,7 +176,7 @@ export function HeroSection() {
                       color: "#fff",
                     }}
                   >
-                    Open Library →
+                    {isAuthenticated ? "Open Library →" : "Unlock library →"}
                   </Button>
                 </Link>
               </motion.div>
@@ -234,17 +239,6 @@ export function HeroSection() {
           </div>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer
-        className="relative z-10 px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-2 border-t"
-        style={{ borderColor: "var(--border-default)" }}
-      >
-        <span className="font-mono text-xs text-[var(--text-muted)]">{copyrightLine()}</span>
-        <span className="font-serif text-xs text-[var(--text-muted)] text-center sm:text-right">
-          Your words, your repository.
-        </span>
-      </footer>
     </div>
   );
 }

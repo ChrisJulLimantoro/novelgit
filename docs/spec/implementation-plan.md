@@ -14,7 +14,7 @@ This section summarizes what exists in the repo **today** so the phase detail be
 
 | Phase | Summary |
 |-------|---------|
-| **1 — Infrastructure** | Done: `lib/github.ts`, `lib/config.ts`, `middleware.ts` ( `/edit`, `/admin` ), `app/api/health/route.ts`, Tailwind v4 + app shell. Auth: `/login` + `AUTH_SECRET` cookie. **Note:** `app/page.tsx` is a marketing **hero** (`/`), not a redirect to `/library`. |
+| **1 — Infrastructure** | Done: `lib/github.ts`, `lib/config.ts`, `middleware.ts` ( `/library`, `/edit`, `/admin`, `/api/export/*` ), `app/api/health/route.ts`, Tailwind v4 + app shell. Auth: passphrase on home page after hero (`#private-library`), `AUTH_SECRET` httpOnly cookie; `/login` redirects to `/#private-library`. **Note:** `app/page.tsx` is hero + private gate + footer, not a redirect to `/library`. |
 | **2 — Library** | Done: `app/(main)/library/page.tsx`, `app/(main)/library/actions.ts`, `components/novels/*`, `lib/github-content.ts`, `types/novel.ts`. |
 | **3 — Editor** | Done: `app/(editor)/edit/[novelId]/[chapterSlug]/`, CodeMirror client (`components/editor/*`), chapter sidebar + reorder persisting to `meta.json`, reader pane, local draft + sync actions. |
 | **4 — Polish** | Done: `content/.../analytics.json` + heatmap (`app/(main)/library/[novelId]/analytics/page.tsx`), `lib/word-count.ts`, export `app/api/export/[novelId]/route.ts` + `lib/export-pdf.ts` / `lib/export-docx.ts`. |
