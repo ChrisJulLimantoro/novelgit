@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
-import { Github } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { DarkModeToggle } from "@/components/dark-mode-toggle";
 import { Button } from "@/components/ui/button";
 import { copyrightLine, NOVELGIT_GITHUB_URL } from "@/lib/site";
@@ -190,7 +190,7 @@ export function HeroSection() {
                     variant="outline"
                     className="px-6 h-10 text-base rounded-full gap-2 border-[var(--border-default)] bg-[var(--bg-elevated)] hover:bg-[var(--bg-base)]"
                   >
-                    <Github className="size-4" aria-hidden />
+                    <ExternalLink className="size-4" aria-hidden />
                     View on GitHub
                   </Button>
                 </a>
