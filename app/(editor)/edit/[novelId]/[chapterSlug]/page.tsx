@@ -4,6 +4,7 @@ import { EditorClient } from "@/components/editor/editor-client";
 import { ChapterSidebar } from "@/components/editor/chapter-sidebar";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { copyrightLine } from "@/lib/site";
 
 interface Props {
   params: Promise<{ novelId: string; chapterSlug: string }>;
@@ -28,8 +29,11 @@ export default async function EditorPage({ params }: Props) {
         <Link href="/library" aria-label="Back to library">
           <ArrowLeft size={18} />
         </Link>
-        <span className="font-serif text-sm text-[var(--text-muted)]">
+        <span className="font-serif text-sm text-[var(--text-muted)] truncate min-w-0">
           {meta.title} / {chapterSlug.replace(/^\d+-/, "").replace(/-/g, " ")}
+        </span>
+        <span className="ml-auto shrink-0 font-mono text-[10px] text-[var(--text-muted)] hidden sm:inline">
+          {copyrightLine()}
         </span>
       </div>
 

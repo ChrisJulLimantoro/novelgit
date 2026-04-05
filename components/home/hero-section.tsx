@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
+import { Github } from "lucide-react";
 import { DarkModeToggle } from "@/components/dark-mode-toggle";
 import { Button } from "@/components/ui/button";
+import { copyrightLine, NOVELGIT_GITHUB_URL } from "@/lib/site";
 
 const panels = [
   {
@@ -154,7 +156,7 @@ export function HeroSection() {
               revision is saved, every draft recoverable, and your story is always yours.
             </motion.p>
 
-            <motion.div variants={itemVariants}>
+            <motion.div variants={itemVariants} className="flex flex-wrap items-center gap-3">
               <motion.div
                 whileHover={prefersReduced ? {} : { scale: 1.03 }}
                 whileTap={prefersReduced ? {} : { scale: 0.97 }}
@@ -172,6 +174,26 @@ export function HeroSection() {
                     Open Library →
                   </Button>
                 </Link>
+              </motion.div>
+              <motion.div
+                whileHover={prefersReduced ? {} : { scale: 1.03 }}
+                whileTap={prefersReduced ? {} : { scale: 0.97 }}
+                transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                className="inline-block"
+              >
+                <a
+                  href={NOVELGIT_GITHUB_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Button
+                    variant="outline"
+                    className="px-6 h-10 text-base rounded-full gap-2 border-[var(--border-default)] bg-[var(--bg-elevated)] hover:bg-[var(--bg-base)]"
+                  >
+                    <Github className="size-4" aria-hidden />
+                    View on GitHub
+                  </Button>
+                </a>
               </motion.div>
             </motion.div>
           </motion.div>
@@ -215,11 +237,11 @@ export function HeroSection() {
 
       {/* Footer */}
       <footer
-        className="relative z-10 px-8 py-5 flex items-center justify-between border-t"
+        className="relative z-10 px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-2 border-t"
         style={{ borderColor: "var(--border-default)" }}
       >
-        <span className="font-mono text-xs text-[var(--text-muted)]">novelgit v0.1</span>
-        <span className="font-serif text-xs text-[var(--text-muted)]">
+        <span className="font-mono text-xs text-[var(--text-muted)]">{copyrightLine()}</span>
+        <span className="font-serif text-xs text-[var(--text-muted)] text-center sm:text-right">
           Your words, your repository.
         </span>
       </footer>
