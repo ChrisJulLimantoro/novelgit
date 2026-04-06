@@ -4,14 +4,16 @@ import { getFile } from "@/lib/github-content";
 import { getLibrary } from "@/app/(main)/library/actions";
 import { StatusBadge } from "@/components/novels/status-badge";
 import { NewChapterButton } from "@/components/novels/new-chapter-button";
+import { NovelMetaEditor } from "@/components/novels/novel-meta-editor";
 import { Separator } from "@/components/ui/separator";
 import { BookOpen, ArrowLeft } from "lucide-react";
 
 interface Meta {
-  id: string;
-  title: string;
-  genres: string[];
-  chapterOrder: string[];
+  id:             string;
+  title:          string;
+  genres:         string[];
+  chapterOrder:   string[];
+  chapterTitles?: Record<string, string>;
 }
 
 function prettySlug(slug: string) {
@@ -59,7 +61,7 @@ export default async function NovelPage({
 
       {/* Genre chips */}
       {meta.genres.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-8">
+        <div className="flex flex-wrap gap-2 mb-4">
           {meta.genres.map((g) => (
             <span
               key={g}
@@ -70,6 +72,16 @@ export default async function NovelPage({
           ))}
         </div>
       )}
+
+      {/* Inline metadata editor */}
+      <div className="mb-8">
+        <NovelMetaEditor
+          novelId={novelId}
+          title={novel.title}
+          status={novel.status}
+          genres={meta.genres}
+        />
+      </div>
 
       <Separator className="mb-8" />
 
@@ -92,24 +104,27 @@ export default async function NovelPage({
         </div>
       ) : (
         <ol className="flex flex-col gap-1">
-          {chapters.map((slug, i) => (
-            <li key={slug}>
-              <Link
-                href={`/edit/${novelId}/${slug}`}
-                className="flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-[var(--bg-sidebar)] transition-colors group"
-              >
-                <span className="font-mono text-xs text-[var(--text-muted)] w-6 shrink-0 select-none">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <span className="font-serif text-base text-[var(--text-primary)] capitalize flex-1">
-                  {prettySlug(slug)}
-                </span>
-                <span className="text-xs text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity">
-                  Edit →
-                </span>
-              </Link>
-            </li>
-          ))}
+          {chapters.map((slug, i) => {
+            const displayTitle = meta.chapterTitles?.[slug] ?? prettySlug(slug);
+            return (
+              <li key={slug}>
+                <Link
+                  href={`/edit/${novelId}/${slug}`}
+                  className="flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-[var(--bg-sidebar)] transition-colors group"
+                >
+                  <span className="font-mono text-xs text-[var(--text-muted)] w-6 shrink-0 select-none">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span className="font-serif text-base text-[var(--text-primary)] capitalize flex-1">
+                    {displayTitle}
+                  </span>
+                  <span className="text-xs text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity">
+                    Edit →
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
         </ol>
       )}
     </div>

@@ -307,50 +307,71 @@ body::before {
 
 ---
 
-## CodeMirror Theme
+## TipTap Editor (WYSIWYG — replaces CodeMirror)
 
-The editor currently inherits CodeMirror's default theme. Build a token-based override:
+The editor is now TipTap v3 with `tiptap-markdown` for markdown serialization. It renders rich text natively (bold = bold, headings are large, etc.) and saves to `.md` files on GitHub.
 
-```tsx
-// In editor-client.tsx, pass a theme extension
-import { EditorView } from "@codemirror/view";
+**Packages:** `@tiptap/react @tiptap/pm @tiptap/starter-kit tiptap-markdown @tiptap/extension-placeholder @tiptap/extension-typography @tiptap/extension-character-count`
 
-const novelTheme = EditorView.theme({
-  "&": {
-    background: "transparent",
-    color: "var(--text-primary)",
-  },
-  ".cm-content": {
-    caretColor: "var(--accent)",
-    fontFamily: "var(--font-serif)",
-    fontSize: "19px",
-    lineHeight: "1.8",
-  },
-  ".cm-cursor": {
-    borderLeftColor: "var(--accent)",
-    borderLeftWidth: "2px",
-  },
-  ".cm-selectionBackground": {
-    background: "var(--ink-100) !important",
-  },
-  ".dark & .cm-selectionBackground": {
-    background: "var(--ink-900) !important",
-  },
-  "&.cm-focused": { outline: "none" },
-});
+**Modes:**
+- **Read mode** (default): `editor.setEditable(false)` — clean document view, default cursor, no toolbar formatting controls
+- **Edit mode**: `editor.setEditable(true)` — full formatting toolbar, text cursor, autosave active
 
-// Add to extensions array
-extensions={[markdown(), novelTheme]}
-```
+**Markdown roundtrip:**
+- Load: `editor.commands.setContent(markdownString, { emitUpdate: false })`
+- Save: `(editor.storage as any).markdown.getMarkdown()`
+
+**Dark mode:** Handled automatically via `prose dark:prose-invert` + CSS variable overrides in `globals.css`. No separate theme config needed.
+
+**Key files:**
+- `components/editor/editor-client.tsx` — TipTap `useEditor` hook, read/edit toggle, autosave, sync
+- `components/editor/editor-toolbar.tsx` — formatting toolbar (heading select, bold/italic/strike, lists, blockquote, sidebar toggle, word count, sync)
+- `components/editor/editor-shell.tsx` — manages sidebar open/close state, mobile overlay
+- `app/globals.css` — `.tiptap` base styles, placeholder, `dark:prose-invert` token overrides
+
+**Typography extension** handles smart quotes and em-dashes automatically — the markdown output will use curly quotes/proper dashes, which is correct for novel writing.
 
 ---
 
 ## Choosing & Implementing
 
-1. Pick a theme (A, B, or C) — or mix elements (e.g., Theme A cards + Theme B toolbar)
-2. Apply the token additions from the "Token Additions" section to `globals.css` first
-3. Update components in this order: `NovelCard` → `LibraryPage` → `ChapterSidebar` → `editor-client.tsx`
-4. Add `scaleIn` keyframe and `prefers-reduced-motion` block to `globals.css`
-5. Test both light and dark mode after each component change
+Theme C is implemented. Do not switch layout patterns without updating all three layers: the grid in `library/page.tsx`, the card in `novel-card.tsx`, and the skeleton in `LibrarySkeleton`.
 
 **Do not:** mix layout patterns from different themes (e.g., bento grid + list rows). Pick one layout approach and be consistent.
+
+---
+
+## Implemented Feature Log
+
+This section records non-obvious decisions made during implementation so future sessions don't re-derive them.
+
+### Genre system (`types/novel.ts`)
+- `GENRES` is a `const` array — the single source of truth for all genre pills across the app
+- `NovelSchema.genres` uses `z.array(z.string()).default([])` — NOT `z.enum(GENRES)` — so existing data without genres parses without error
+- Genres are stored in **both** `config/novels.json` (for library listing without extra fetches) and `content/{id}/meta.json`
+- The `updateNovel` action in `library/actions.ts` keeps both files in sync
+
+### Novel metadata editing (`components/novels/novel-meta-editor.tsx`)
+- Client component, toggled by "Edit metadata" button on `/library/[novelId]`
+- Edits title, status (pill select), and genres (pill multi-select) in one form
+- Calls `updateNovel(novelId, { title, status, genres })` — updates both `novels.json` and `meta.json`
+- `revalidatePath` covers both `/library` and `/library/[novelId]`
+
+### Chapter titles (`meta.json` schema)
+- `meta.chapterTitles: Record<string, string>` — maps slug → display title
+- Slug never changes after creation (changing it would require renaming the `.md` file and rewriting chapterOrder)
+- `createChapter` now persists the title: `meta.chapterTitles = { ...meta.chapterTitles, [slug]: title }`
+- `renameChapterTitle(novelId, slug, title)` updates the stored title without touching the slug
+- Double-click a chapter row in the sidebar to rename inline
+
+### Editor shell and sidebar (`components/editor/editor-shell.tsx`)
+- `EditorShell` (client component) owns `sidebarOpen` state and renders both `ChapterSidebar` and `EditorClient`
+- On mobile: sidebar is `fixed` with a backdrop overlay; clicking backdrop calls `onClose`
+- On desktop: sidebar is `md:relative` in-flow; toggle via toolbar button
+- `ChapterSidebar` receives `open: boolean` + `onClose: () => void` props
+
+### Authentication (`app/login/`)
+- Simple passphrase gate: cookie `auth_token` must equal `AUTH_SECRET` from `.env.local`
+- `middleware.ts` protects `/edit/:path*` and `/admin/:path*`
+- Login page at `/login` with redirect-back via `?from=` param
+- Cookie is httpOnly, 30-day expiry, SameSite=lax

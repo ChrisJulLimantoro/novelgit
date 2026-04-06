@@ -1,34 +1,96 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import CodeMirror from "@uiw/react-codemirror";
-import { markdown } from "@codemirror/lang-markdown";
+import { useEffect, useRef, useState } from "react";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import { Markdown } from "tiptap-markdown";
+import Placeholder from "@tiptap/extension-placeholder";
+import Typography from "@tiptap/extension-typography";
+import CharacterCount from "@tiptap/extension-character-count";
 import { useDebouncedCallback } from "use-debounce";
 import { saveDraft, loadDraft, clearDraft } from "@/lib/local-draft";
 import { syncChapter } from "@/app/(editor)/edit/[novelId]/[chapterSlug]/actions";
 import { DraftRestoreDialog } from "./draft-restore-dialog";
 import { SyncStatusBanner } from "./sync-status-banner";
-import { ReaderPane } from "./reader-pane";
-import { countWords } from "@/lib/word-count";
+import { EditorToolbar } from "./editor-toolbar";
 
 interface Props {
-  novelId:        string;
-  chapterSlug:    string;
-  initialContent: string;
-  fetchedAt:      string; // ISO — when the GitHub version was fetched
+  novelId:         string;
+  chapterSlug:     string;
+  initialContent:  string;
+  fetchedAt:       string;
+  sidebarOpen:     boolean;
+  onToggleSidebar: () => void;
 }
 
 type SyncState = "idle" | "syncing" | "success" | "error";
 
-export function EditorClient({ novelId, chapterSlug, initialContent, fetchedAt }: Props) {
-  const [value, setValue]             = useState(initialContent);
+export function EditorClient({
+  novelId, chapterSlug, initialContent, fetchedAt, sidebarOpen, onToggleSidebar,
+}: Props) {
+  const [editMode, setEditMode]       = useState(false); // read-first
   const [syncState, setSyncState]     = useState<SyncState>("idle");
   const [showRestore, setShowRestore] = useState(false);
   const [draftDate, setDraftDate]     = useState("");
-  const [readerMode, setReaderMode]   = useState(false);
-  const wordCount                     = countWords(value);
 
-  // On mount: check for newer local draft
+  // Keep a ref to latest markdown for sync — avoids stale closure in keydown handler
+  const latestMd = useRef(initialContent);
+
+  const autosave = useDebouncedCallback((md: string) => {
+    saveDraft(novelId, chapterSlug, md);
+  }, 1500);
+
+  const editor = useEditor({
+    immediatelyRender: false,  // required for Next.js SSR — prevents hydration mismatch
+    extensions: [
+      StarterKit,
+      Markdown.configure({
+        html: false,
+        tightLists: true,
+        transformPastedText: true,  // paste markdown → rich text nodes
+        transformCopiedText: true,  // copy selection → plain markdown
+      }),
+      Placeholder.configure({ placeholder: "Begin your story…" }),
+      Typography,
+      CharacterCount,
+    ],
+    content: "",         // populated in useEffect once editor is ready
+    editable: false,     // start in read mode
+    editorProps: {
+      attributes: {
+        class: "tiptap prose prose-lg dark:prose-invert max-w-none focus:outline-none font-serif",
+        style: "font-size:19px;line-height:1.8;",
+        spellCheck: "true",
+      },
+    },
+    onUpdate({ editor }) {
+      if (!editor.isEditable) return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const md = (editor.storage as any).markdown.getMarkdown() as string;
+      latestMd.current = md;
+      autosave(md);
+    },
+  });
+
+  // Load initial content once the editor instance is ready
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    editor.commands.setContent(initialContent, { emitUpdate: false });
+    latestMd.current = initialContent;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor]);
+
+  // Sync editMode → TipTap editable flag
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    editor.setEditable(editMode);
+    if (editMode) {
+      // Focus without moving the cursor — preserve position, or start at beginning
+      setTimeout(() => editor.commands.focus(), 10);
+    }
+  }, [editor, editMode]);
+
+  // Check for a newer local draft on mount
   useEffect(() => {
     const draft = loadDraft(novelId, chapterSlug);
     if (draft && draft.savedAt > fetchedAt) {
@@ -37,19 +99,10 @@ export function EditorClient({ novelId, chapterSlug, initialContent, fetchedAt }
     }
   }, [novelId, chapterSlug, fetchedAt]);
 
-  const autosave = useDebouncedCallback((content: string) => {
-    saveDraft(novelId, chapterSlug, content);
-  }, 1500);
-
-  const handleChange = useCallback((val: string) => {
-    setValue(val);
-    autosave(val);
-  }, [autosave]);
-
   async function handleSync() {
     setSyncState("syncing");
     try {
-      await syncChapter(novelId, chapterSlug, value);
+      await syncChapter(novelId, chapterSlug, latestMd.current);
       clearDraft(novelId, chapterSlug);
       setSyncState("success");
     } catch {
@@ -57,7 +110,7 @@ export function EditorClient({ novelId, chapterSlug, initialContent, fetchedAt }
     }
   }
 
-  // Cmd+S shortcut
+  // Keyboard shortcuts
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") {
@@ -66,59 +119,43 @@ export function EditorClient({ novelId, chapterSlug, initialContent, fetchedAt }
       }
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "r") {
         e.preventDefault();
-        setReaderMode((m) => !m);
+        setEditMode((m) => !m);
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value]);
+  }, []);
+
+  if (!editor) return null;
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-6 py-2 border-b border-[var(--border-default)] text-sm text-[var(--text-muted)]">
-        <span>{wordCount} words</span>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setReaderMode((m) => !m)}
-            className="px-3 py-1 rounded-md border border-[var(--border-default)] text-sm hover:bg-[var(--bg-sidebar)]"
-            aria-pressed={readerMode}
-          >
-            {readerMode ? "Edit" : "Read"}
-          </button>
-          <button
-            onClick={handleSync}
-            disabled={syncState === "syncing"}
-            className="px-3 py-1 rounded-md bg-[var(--accent)] text-white text-sm hover:bg-[var(--accent-hover)] disabled:opacity-50"
-          >
-            {syncState === "syncing" ? "Syncing…" : "Sync to GitHub"}
-          </button>
-        </div>
-      </div>
+    <div className="flex flex-col flex-1 overflow-hidden min-w-0">
+      <EditorToolbar
+        editor={editor}
+        editMode={editMode}
+        onToggleEdit={() => setEditMode((m) => !m)}
+        syncState={syncState}
+        onSync={handleSync}
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={onToggleSidebar}
+      />
 
-      {/* Editor / Reader */}
+      {/* Scrollable document area */}
       <div
-        className="flex-1 overflow-y-auto transition-opacity duration-150"
-        style={{ opacity: 1 }}
+        className="flex-1 overflow-y-auto"
+        style={{ background: "var(--bg-editor)" }}
+        // Only focus-end when clicking the *padding area* below the text,
+        // not when clicking inside the editor itself (those events bubble up).
+        onClick={(e) => {
+          if (editMode && editor && e.target === e.currentTarget) {
+            editor.commands.focus("end");
+          }
+        }}
       >
-        {readerMode ? (
-          <ReaderPane content={value} />
-        ) : (
-          <div className="max-w-[var(--editor-max-width)] mx-auto py-20 px-4">
-            <CodeMirror
-              value={value}
-              onChange={handleChange}
-              extensions={[markdown()]}
-              basicSetup={{
-                lineNumbers:         false,
-                foldGutter:          false,
-                highlightActiveLine: false,
-              }}
-              style={{ fontFamily: "var(--font-serif)", fontSize: "19px", lineHeight: "1.8" }}
-            />
-          </div>
-        )}
+        <div className="max-w-[var(--editor-max-width)] mx-auto py-16 px-6 sm:px-8">
+          <EditorContent editor={editor} />
+        </div>
       </div>
 
       <DraftRestoreDialog
@@ -126,7 +163,10 @@ export function EditorClient({ novelId, chapterSlug, initialContent, fetchedAt }
         draftDate={draftDate}
         onRestore={() => {
           const draft = loadDraft(novelId, chapterSlug);
-          if (draft) setValue(draft.content);
+          if (draft && editor) {
+            editor.commands.setContent(draft.content, { emitUpdate: false });
+            latestMd.current = draft.content;
+          }
           setShowRestore(false);
         }}
         onDiscard={() => {

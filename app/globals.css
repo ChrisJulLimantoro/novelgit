@@ -228,3 +228,38 @@ body {
     @apply font-sans;
   }
 }
+
+/* ─── TipTap / ProseMirror editor ─── */
+.tiptap {
+  outline: none;
+  min-height: 60vh;
+}
+
+/* Placeholder */
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+/* Read-mode cursor: default arrow, not text beam */
+.tiptap:not([contenteditable="true"]) {
+  cursor: default;
+  user-select: text;
+}
+
+/* Prose dark-mode overrides tied to our tokens */
+.dark .tiptap.prose {
+  --tw-prose-body:        var(--text-primary);
+  --tw-prose-headings:    var(--text-primary);
+  --tw-prose-bold:        var(--text-primary);
+  --tw-prose-quotes:      var(--text-muted);
+  --tw-prose-quote-borders: var(--border-default);
+  --tw-prose-code:        var(--text-primary);
+  --tw-prose-pre-bg:      var(--bg-sidebar);
+  --tw-prose-hr:          var(--border-default);
+  --tw-prose-bullets:     var(--text-muted);
+  --tw-prose-counters:    var(--text-muted);
+}

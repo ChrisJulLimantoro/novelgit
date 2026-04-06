@@ -67,9 +67,21 @@ export async function createChapter(novelId: string, title: string) {
   // Create the chapter file
   await putFile(`content/${novelId}/manuscript/${slug}.md`, `# ${title}\n\n`, "", `feat: new chapter ${slug}`);
 
-  meta.chapterOrder = [...(meta.chapterOrder ?? []), slug];
+  meta.chapterOrder  = [...(meta.chapterOrder ?? []), slug];
+  meta.chapterTitles = { ...(meta.chapterTitles ?? {}), [slug]: title };
   await putFile(metaPath, JSON.stringify(meta, null, 2), sha, `chore: register chapter ${slug}`);
 
   revalidatePath(`/edit/${novelId}`);
+  revalidatePath(`/library/${novelId}`);
   return slug;
+}
+
+export async function renameChapterTitle(novelId: string, slug: string, title: string) {
+  const metaPath = `content/${novelId}/meta.json`;
+  const { content, sha } = await getFile(metaPath);
+  const meta = JSON.parse(content);
+  meta.chapterTitles = { ...(meta.chapterTitles ?? {}), [slug]: title };
+  await putFile(metaPath, JSON.stringify(meta, null, 2), sha, `chore: rename chapter ${slug}`);
+  revalidatePath(`/edit/${novelId}/${slug}`);
+  revalidatePath(`/library/${novelId}`);
 }

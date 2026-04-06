@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getFile, putFile } from "@/lib/github-content";
-import { LibrarySchema, type Novel } from "@/types/novel";
+import { LibrarySchema, type Novel, type Genre } from "@/types/novel";
 
 export async function getLibrary() {
   const { content } = await getFile("config/novels.json");
@@ -44,5 +44,29 @@ export async function createNovel(formData: FormData) {
   await putFile(`content/${id}/manuscript/.gitkeep`, "",                            "", `chore: scaffold ${id} manuscript`);
   await putFile(`content/${id}/lore/.gitkeep`,       "",                            "", `chore: scaffold ${id} lore`);
 
+  revalidatePath("/library");
+}
+
+export async function updateNovel(
+  novelId: string,
+  data: { title: string; status: Novel["status"]; genres: Genre[] },
+) {
+  // Update registry
+  const { content: regContent, sha: regSha } = await getFile("config/novels.json");
+  const library = LibrarySchema.parse(JSON.parse(regContent));
+  const idx = library.novels.findIndex((n) => n.id === novelId);
+  if (idx === -1) throw new Error(`Novel ${novelId} not found`);
+  library.novels[idx] = { ...library.novels[idx], ...data };
+  await putFile("config/novels.json", JSON.stringify(library, null, 2), regSha, `feat: update novel ${novelId}`);
+
+  // Update meta.json
+  const metaPath = `content/${novelId}/meta.json`;
+  const { content: metaContent, sha: metaSha } = await getFile(metaPath);
+  const meta = JSON.parse(metaContent);
+  meta.title  = data.title;
+  meta.genres = data.genres;
+  await putFile(metaPath, JSON.stringify(meta, null, 2), metaSha, `chore: update meta ${novelId}`);
+
+  revalidatePath(`/library/${novelId}`);
   revalidatePath("/library");
 }
