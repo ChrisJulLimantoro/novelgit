@@ -14,12 +14,12 @@ This section summarizes what exists in the repo **today** so the phase detail be
 
 | Phase | Summary |
 |-------|---------|
-| **1 — Infrastructure** | Done: `lib/github.ts`, `lib/config.ts`, `middleware.ts` ( `/library`, `/edit`, `/admin`, `/api/export/*` ), `app/api/health/route.ts`, Tailwind v4 + app shell. Auth: passphrase on home page after hero (`#private-library`), `AUTH_SECRET` httpOnly cookie; `/login` redirects to `/#private-library`. **Note:** `app/page.tsx` is hero + private gate + footer, not a redirect to `/library`. |
-| **2 — Library** | Done: `app/(main)/library/page.tsx`, `app/(main)/library/actions.ts`, `components/novels/*`, `lib/github-content.ts`, `types/novel.ts`. |
-| **3 — Editor** | Done: `app/(editor)/edit/[novelId]/[chapterSlug]/`, CodeMirror client (`components/editor/*`), chapter sidebar + reorder persisting to `meta.json`, reader pane, local draft + sync actions. |
-| **4 — Polish** | Done: `content/.../analytics.json` + heatmap (`app/(main)/library/[novelId]/analytics/page.tsx`), `lib/word-count.ts`, export `app/api/export/[novelId]/route.ts` + `lib/export-pdf.ts` / `lib/export-docx.ts`. |
+| **1 — Infrastructure** | Done: `lib/github.ts` (calls `assertGithubRepoConfigured`), `lib/config.ts`, **`proxy.ts`** (matches `/library`, `/edit`, `/admin`, `/api/export/*`), `lib/auth.ts` (opaque session cookie + `requireAuth`), `app/api/health/route.ts`, Tailwind v4 + app shell. Auth: passphrase on home page after hero (`#private-library`); **`/login`** redirects to `/?…#private-library`. **Note:** `app/page.tsx` is hero + private gate + footer, not a redirect to `/library`. |
+| **2 — Library** | Done: `app/(main)/library/page.tsx`, `app/(main)/library/actions.ts` (with `requireAuth`), `components/novels/*`, `lib/github-content.ts`, `types/novel.ts`. |
+| **3 — Editor** | Done: `app/(editor)/edit/[novelId]/[chapterSlug]/`, **TipTap** client (`components/editor/*`), chapter sidebar + reorder persisting to `meta.json`, reader pane, local draft + sync actions, `lib/ids.ts` path validation. |
+| **4 — Polish** | Done: `content/.../analytics.json` + heatmap (`app/(main)/library/[novelId]/analytics/page.tsx`), `lib/word-count.ts`, export `app/api/export/[novelId]/route.ts` (auth + id checks) + `lib/export-pdf.ts` / `lib/export-docx.ts`. |
 
-**Not built (per design-docs):** lore/wiki wikilinks, multi-user OAuth. **`/admin`** is matched by middleware but may have no pages yet—add routes as needed.
+**Not built (per design-docs):** lore/wiki wikilinks, multi-user OAuth. **`/admin`** is matched by `proxy.ts` but may have no pages yet—add routes as needed.
 
 Paths in the tables below use older shorthand (`app/library/...`); the live app uses `app/(main)/library/...` and `app/(editor)/edit/...`.
 
@@ -35,7 +35,7 @@ Before any phase begins:
 4. In Vercel project settings → Environment Variables, add:
    - `GITHUB_TOKEN` — the PAT from step 2
    - `GITHUB_REPO` — in the format `owner/repo-name`
-   - `AUTH_SECRET` — a random secret string used by middleware (see Phase 1)
+   - `AUTH_SECRET` — passphrase used to verify login and mint opaque session cookies (see Phase 1)
 
 Seed the content repo with these files before running the app for the first time:
 
@@ -343,16 +343,20 @@ novelgit/
 │   ├── novels/
 │   └── ui/
 ├── lib/
+│   ├── auth.ts                           ← session token + requireAuth / cookie verify
+│   ├── ids.ts                            ← assertSafeNovelId / assertSafeChapterSlug
+│   ├── safe-redirect.ts                  ← internal-only post-login paths
 │   ├── github.ts
 │   ├── github-content.ts
-│   ├── config.ts
+│   ├── config.ts                         ← assertGithubRepoConfigured
 │   ├── local-draft.ts
 │   ├── word-count.ts
 │   ├── export-pdf.ts
 │   └── export-docx.ts
 ├── types/
 │   └── novel.ts
-├── middleware.ts
+├── proxy.ts                              ← route protection (Next.js 16 convention)
+├── app/unauthorized.tsx                  ← requireAuth() fallback UI
 ├── .env.example                          ← committed template
 └── .env.local                            ← git-ignored secrets
 ```

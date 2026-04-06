@@ -370,8 +370,8 @@ This section records non-obvious decisions made during implementation so future 
 - On desktop: sidebar is `md:relative` in-flow; toggle via toolbar button
 - `ChapterSidebar` receives `open: boolean` + `onClose: () => void` props
 
-### Authentication (`app/login/`)
-- Simple passphrase gate: cookie `auth_token` must equal `AUTH_SECRET` from `.env.local`
-- `middleware.ts` protects `/edit/:path*` and `/admin/:path*`
-- Login page at `/login` with redirect-back via `?from=` param
-- Cookie is httpOnly, 30-day expiry, SameSite=lax
+### Authentication (`app/login/`, `lib/auth.ts`, `proxy.ts`)
+- Passphrase gate: users enter the value of `AUTH_SECRET`; on success the app sets an **opaque** `auth_token` cookie (HMAC-based session), not the raw secret
+- **`proxy.ts`** protects `/library`, `/edit`, `/admin`, `/api/export/*` (Next.js 16 convention; same role as classic `middleware`)
+- **`requireAuth()`** in server actions and cookie checks on export for defense in depth
+- `/login` redirects to `/?from=…#private-library`; cookie is httpOnly, 30-day expiry, SameSite=lax

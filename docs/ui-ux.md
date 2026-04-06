@@ -7,6 +7,8 @@
 
 **Repo status:** UI primitives are already present under `components/ui/**` and feature areas under `components/editor/**`, `components/novels/**`, etc. The `npx shadcn@latest init` / `add` steps below are the **original bootstrap instructions** for new clones or when adding components—not a prerequisite on every pull.
 
+**Editor (current):** The live app uses **TipTap** (`@tiptap/react`, `tiptap-markdown`) for the writing surface—not CodeMirror. Later sections of this file still mention CodeMirror / WikiLink extensions as **historical or planned** ideas; treat the implemented `components/editor/**` stack as source of truth.
+
 ---
 
 ## 1. Library Choices
@@ -48,7 +50,7 @@ npx shadcn@latest add button card dialog badge separator scroll-area tooltip she
 | `lucide-react` | All icons — one coherent set | `npm install lucide-react` |
 | `next-themes` | System dark/light mode, no flash on load | `npm install next-themes` |
 | `@dnd-kit/core` `@dnd-kit/sortable` `@dnd-kit/utilities` | Chapter drag-and-drop reorder | `npm install @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities` |
-| `@uiw/react-codemirror` `@codemirror/lang-markdown` | Markdown editor | `npm install @uiw/react-codemirror @codemirror/lang-markdown` |
+| `@tiptap/react` `@tiptap/starter-kit` `tiptap-markdown` (+ typography, placeholder, character-count) | Markdown-capable WYSIWYG editor | See `package.json` |
 | `react-markdown` `remark-gfm` `rehype-raw` | Reader Mode HTML rendering | `npm install react-markdown remark-gfm rehype-raw` |
 | `use-debounce` | localStorage autosave debounce | `npm install use-debounce` |
 | `cmdk` | Command palette (Cmd+K) | `npm install cmdk` |
@@ -57,12 +59,12 @@ npx shadcn@latest add button card dialog badge separator scroll-area tooltip she
 | `@tailwindcss/typography` | Prose styles for Reader Mode | `npm install @tailwindcss/typography` |
 | `@nivo/calendar` | Writing heatmap (Phase 4) | `npm install @nivo/calendar` |
 
-**Excluded:**
-- `framer-motion` — too heavy; all animation done with CSS transitions
+**Excluded / legacy notes:**
+- `framer-motion` — the **landing hero** may still use it; most in-app motion uses CSS. Prefer CSS transitions for new UI.
 - `react-calendar-heatmap` — last updated 2021, no TypeScript types; use `@nivo/calendar` instead
-- WYSIWYG editors (TipTap, Slate, Lexical) — CodeMirror is intentionally minimal and Markdown-native
+- **CodeMirror** — not used in the current editor; TipTap + `tiptap-markdown` replaced the earlier CodeMirror experiment.
 
-**CodeMirror theme:** Build custom from design tokens. Do **not** use `@codemirror/theme-one-dark` — it conflicts with the parchment aesthetic.
+**TipTap / prose:** Style the editor surface with Tailwind `prose` + design tokens (`EditorContent` in `editor-client.tsx`). Match Reader pane typography for a coherent read/write experience.
 
 **`@tailwindcss/typography` in Tailwind v4:** Add via `@plugin "@tailwindcss/typography"` in `globals.css` (Tailwind v4 plugin syntax, not a `tailwind.config.ts` entry).
 

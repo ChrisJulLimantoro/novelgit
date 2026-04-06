@@ -21,11 +21,14 @@ Decoupled **Git-CMS** pattern:
 - **Write path:** Next.js Server Actions + Octokit (`createOrUpdateFileContents`). Updates use the latest file SHA per request to reduce 409 conflicts.
 - **Local editing:** The same repo can be cloned and edited offline (for example in Obsidian); web sync and local Git workflows coexist with the usual merge/conflict caveats.
 
+**Route protection:** `proxy.ts` implements the same role as classic `middleware` (Next.js 16 naming). It runs on matched paths and redirects unauthenticated users to `/` with `?from=…`.
+
 **Route groups (implementation):**
 
 - `app/page.tsx` — public marketing hero, then passphrase form for the **private library** (or a “Go to library” CTA when already signed in).
-- `app/(main)/` — shell with top nav: library and novel subroutes under `app/(main)/library/` (all require auth).
+- `app/(main)/` — shell with top nav: library and novel subroutes under `app/(main)/library/` (all require auth + server-side checks).
 - `app/(editor)/` — full-height editor layout for `app/(editor)/edit/[novelId]/[chapterSlug]/`.
+- `app/unauthorized.tsx` — fallback UI when `requireAuth()` calls `unauthorized()`.
 
 ---
 
@@ -41,7 +44,7 @@ Decoupled **Git-CMS** pattern:
     /manuscript        ← Chapter .md files (e.g. 01-intro.md)
     /lore              ← World-building .md (scaffolded; advanced wiki features TBD)
     meta.json          ← Title, genre, chapterOrder, etc.
-    analytics.json     ← Daily word-count entries for heatmap (written on sync)
+    analytics.json     ← Daily word-count entries for heatmap (best-effort on sync)
 ```
 
 ### `novels.json` (library registry)
@@ -59,9 +62,9 @@ Updated via the web UI when creating novels. Shape matches the Zod schema in `ty
 
 ### Zen editor
 
-- Markdown editing (CodeMirror), GFM-oriented reading pane.
+- **TipTap** WYSIWYG with Markdown storage (`tiptap-markdown`), typography and character-count extensions, and a reader-oriented view.
 - **Local:** Debounced draft in `localStorage` (see `lib/local-draft.ts`).
-- **Cloud:** Explicit sync commits the chapter file via GitHub API; analytics row appended on sync where implemented.
+- **Cloud:** Explicit sync commits the chapter file via GitHub API; analytics update is wrapped so failures log a warning and **do not** fail the chapter sync.
 
 ### Analytics
 
@@ -69,7 +72,7 @@ Updated via the web UI when creating novels. Shape matches the Zod schema in `ty
 
 ### Export
 
-- `GET /api/export/[novelId]?format=pdf|docx` — chapters assembled in `meta.json` chapter order.
+- `GET /api/export/[novelId]?format=pdf|docx` — chapters assembled in `meta.json` chapter order; requires the same session cookie as the rest of the app.
 
 ### Integrated wiki (world bible)
 
@@ -89,8 +92,13 @@ Always obtain a fresh `sha` with `getFile` immediately before `putFile` in the s
 
 ### Security and access
 
-- **Environment:** `GITHUB_TOKEN`, `GITHUB_REPO`, `AUTH_SECRET` (see `.env.example` and README).
-- **Access control:** Middleware matches `/library`, `/edit`, `/admin`, and `/api/export/*`. Unauthenticated users are redirected to `/` with `?from=…` pointing at the URL they tried; the home page scrolls to the **Private library** sign-in block (`#private-library`). The passphrase must equal `AUTH_SECRET`; an httpOnly cookie is set on success. The hero and marketing copy on `/` stay public; only the library, editor, and export API require a session. Legacy `/login` redirects to the same home-page sign-in anchor.
+- **Environment:** `GITHUB_TOKEN`, `GITHUB_REPO`, `AUTH_SECRET` (see `.env.example` and README). `GITHUB_REPO` is validated at startup (`assertGithubRepoConfigured` in `lib/config.ts` / `lib/github.ts`).
+- **Route gate:** `proxy.ts` matcher covers `/library`, `/edit`, `/admin`, `/api/export/*`. Unauthenticated users are redirected to `/` with `?from=…`; the client can scroll to **`#private-library`** when `from` is present.
+- **Session:** On successful login, `auth_token` is an **opaque** value (HMAC of a random session id with `AUTH_SECRET`), not the passphrase itself. Legacy cookies that equal `AUTH_SECRET` are still accepted for migration. httpOnly, SameSite=lax, 30-day expiry.
+- **Defense in depth:** Server actions (`getLibrary`, `createNovel`, `updateNovel`, edit actions, etc.) call **`requireAuth()`**; export `GET` checks **`isValidAuthCookie`**.
+- **Path safety:** `novelId` and `chapterSlug` are validated against strict patterns (`lib/ids.ts`) before building GitHub paths.
+- **Redirects:** Post-login `from` is validated as an internal path only (`lib/safe-redirect.ts`).
+- **Public surface:** The hero and marketing copy on `/` stay public; library, editor, and export require a session. Legacy `/login` redirects to the home-page sign-in anchor.
 
 ---
 
@@ -104,7 +112,7 @@ Always obtain a fresh `sha` with `getFile` immediately before `putFile` in the s
 | Reader / edit toggle in editor | Done |
 | Analytics + heatmap + `analytics.json` on sync | Done |
 | PDF / DOCX export | Done |
-| Passphrase auth for `/library`, `/edit`, `/admin`, `/api/export/*` | Done |
+| Passphrase + opaque session + `proxy` + `requireAuth` for protected routes | Done |
 | Lore wiki + bidirectional `[[links]]` | Not started |
 | Multi-user auth (e.g. OAuth) | Not started |
 
@@ -112,5 +120,5 @@ Always obtain a fresh `sha` with `getFile` immediately before `putFile` in the s
 
 ## 7. Operational notes
 
-- **Deploy latency:** A full site redeploy on Vercel is separate from GitHub file updates via the API; the UI may still warn users that GitHub/Vercel propagation can take time after sync.
+- **Deploy latency:** A full site redeploy on Vercel is separate from GitHub file updates via the API; sync UI copy does not promise an automatic full page refresh.
 - **Conflicts:** If editing from multiple clients, always refresh from GitHub (or rely on the editor’s load path) before syncing; the server uses the latest SHA when committing.
