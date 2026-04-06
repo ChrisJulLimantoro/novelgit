@@ -1,6 +1,7 @@
 "use client";
 
 import type { Editor } from "@tiptap/react";
+import { useEditorState } from "@tiptap/react";
 import {
   Bold, Italic, Strikethrough,
   List, ListOrdered, Quote,
@@ -74,7 +75,12 @@ export function EditorToolbar({
   fontSize, onFontSizeChange, readingTheme, onReadingThemeChange, resolvedTheme,
 }: Props) {
   const themes = resolvedTheme === "dark" ? DARK_THEMES : LIGHT_THEMES;
-  const words = editor.storage.characterCount?.words() ?? 0;
+
+  const words = useEditorState({
+    editor,
+    selector: ({ editor: ed }) =>
+      ed.storage.characterCount?.words() ?? 0,
+  });
 
   const headingValue =
     editor.isActive("heading", { level: 1 }) ? "h1" :

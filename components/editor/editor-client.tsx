@@ -15,10 +15,13 @@ import { syncChapter } from "@/app/(editor)/edit/[novelId]/[chapterSlug]/actions
 import { DraftRestoreDialog } from "./draft-restore-dialog";
 import { SyncStatusBanner } from "./sync-status-banner";
 import { EditorToolbar } from "./editor-toolbar";
+import { ChapterReadNav } from "./chapter-read-nav";
+import { cn } from "@/lib/utils";
 
 interface Props {
   novelId:         string;
   chapterSlug:     string;
+  chapterOrder:    string[];
   initialContent:  string;
   fetchedAt:       string;
   sidebarOpen:     boolean;
@@ -28,7 +31,7 @@ interface Props {
 type SyncState = "idle" | "syncing" | "success" | "error";
 
 export function EditorClient({
-  novelId, chapterSlug, initialContent, fetchedAt, sidebarOpen, onToggleSidebar,
+  novelId, chapterSlug, chapterOrder, initialContent, fetchedAt, sidebarOpen, onToggleSidebar,
 }: Props) {
   const { resolvedTheme } = useTheme();
   const [editMode, setEditMode]       = useState(false); // read-first
@@ -187,10 +190,26 @@ export function EditorClient({
           }
         }}
       >
-        <div className="max-w-[var(--editor-max-width)] mx-auto py-16 px-6 sm:px-8">
+        <div
+          className={cn(
+            "max-w-[var(--editor-max-width)] mx-auto px-6 sm:px-8",
+            !editMode && chapterOrder.length > 0
+              ? "pt-16 pb-[max(7rem,calc(env(safe-area-inset-bottom,0px)+5.5rem))] sm:pb-32"
+              : "py-16",
+          )}
+        >
           <EditorContent editor={editor} />
         </div>
       </div>
+
+      {!editMode && chapterOrder.length > 0 && (
+        <ChapterReadNav
+          novelId={novelId}
+          chapterSlug={chapterSlug}
+          chapterOrder={chapterOrder}
+          syncState={syncState}
+        />
+      )}
 
       <DraftRestoreDialog
         open={showRestore}

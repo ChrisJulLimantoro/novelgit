@@ -41,6 +41,7 @@ export function EditorShell({
       <EditorClient
         novelId={novelId}
         chapterSlug={chapterSlug}
+        chapterOrder={chapterOrder}
         initialContent={initialContent}
         fetchedAt={fetchedAt}
         sidebarOpen={sidebarOpen}
