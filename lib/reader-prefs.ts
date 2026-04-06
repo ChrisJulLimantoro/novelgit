@@ -1,5 +1,7 @@
 export type FontSize = "sm" | "md" | "lg" | "xl";
-export type ReadingTheme = "default" | "sepia" | "night";
+// "sepia" = warm parchment light (only for light mode)
+// "warm"  = warm dark brownish  (only for dark mode)
+export type ReadingTheme = "default" | "sepia" | "warm";
 
 export interface ReaderPrefs {
   fontSize:     FontSize;

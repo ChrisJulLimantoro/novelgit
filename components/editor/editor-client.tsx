@@ -10,6 +10,7 @@ import CharacterCount from "@tiptap/extension-character-count";
 import { useDebouncedCallback } from "use-debounce";
 import { saveDraft, loadDraft, clearDraft } from "@/lib/local-draft";
 import { loadReaderPrefs, saveReaderPrefs, type FontSize, type ReadingTheme } from "@/lib/reader-prefs";
+import { useTheme } from "@/components/theme-provider";
 import { syncChapter } from "@/app/(editor)/edit/[novelId]/[chapterSlug]/actions";
 import { DraftRestoreDialog } from "./draft-restore-dialog";
 import { SyncStatusBanner } from "./sync-status-banner";
@@ -29,6 +30,7 @@ type SyncState = "idle" | "syncing" | "success" | "error";
 export function EditorClient({
   novelId, chapterSlug, initialContent, fetchedAt, sidebarOpen, onToggleSidebar,
 }: Props) {
+  const { resolvedTheme } = useTheme();
   const [editMode, setEditMode]       = useState(false); // read-first
   const [syncState, setSyncState]     = useState<SyncState>("idle");
   const [showRestore, setShowRestore] = useState(false);
@@ -100,6 +102,16 @@ export function EditorClient({
     setReadingTheme(prefs.readingTheme);
   }, []);
 
+  // Reset reading theme when global light/dark mode changes if the stored theme
+  // is incompatible (sepia is light-only; warm is dark-only).
+  useEffect(() => {
+    setReadingTheme((current) => {
+      if (resolvedTheme === "dark"  && current === "sepia") return "default";
+      if (resolvedTheme === "light" && current === "warm")  return "default";
+      return current;
+    });
+  }, [resolvedTheme]);
+
   // Check for a newer local draft on mount
   useEffect(() => {
     const draft = loadDraft(novelId, chapterSlug);
@@ -156,6 +168,7 @@ export function EditorClient({
         onFontSizeChange={(s) => { setFontSize(s); saveReaderPrefs({ fontSize: s, readingTheme }); }}
         readingTheme={readingTheme}
         onReadingThemeChange={(t) => { setReadingTheme(t); saveReaderPrefs({ fontSize, readingTheme: t }); }}
+        resolvedTheme={resolvedTheme}
       />
 
       {/* Scrollable document area */}

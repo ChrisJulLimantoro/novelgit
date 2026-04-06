@@ -257,15 +257,17 @@ body {
 }
 
 /* Reading theme overrides — scoped to the scroll container, cascade into .tiptap */
+/* "sepia" is a light-mode-only warm parchment */
 [data-reading-theme="sepia"] {
   --bg-editor:      #f5efe0;
   --text-primary:   #2d1f0f;
   --border-default: #d9c5a0;
 }
-[data-reading-theme="night"] {
-  --bg-editor:      #141414;
-  --text-primary:   #d9d0c4;
-  --border-default: #2e2e2e;
+/* "warm" is a dark-mode-only warm brownish dark */
+[data-reading-theme="warm"] {
+  --bg-editor:      #241509;
+  --text-primary:   #d9c5a0;
+  --border-default: #5e4229;
 }
 
 /* Prose dark-mode overrides tied to our tokens */

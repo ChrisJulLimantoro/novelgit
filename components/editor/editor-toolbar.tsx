@@ -23,14 +23,18 @@ interface Props {
   onFontSizeChange:    (s: FontSize) => void;
   readingTheme:        ReadingTheme;
   onReadingThemeChange:(t: ReadingTheme) => void;
+  resolvedTheme:       "light" | "dark";
 }
 
 const FONT_SIZES: FontSize[] = ["sm", "md", "lg", "xl"];
 
-const READING_THEMES: { value: ReadingTheme; bg: string; title: string }[] = [
-  { value: "default", bg: "var(--bg-editor)",  title: "Default" },
-  { value: "sepia",   bg: "#f5efe0",            title: "Sepia"   },
-  { value: "night",   bg: "#141414",            title: "Night"   },
+const LIGHT_THEMES: { value: ReadingTheme; bg: string; title: string }[] = [
+  { value: "default", bg: "#ffffff",  title: "Default" },
+  { value: "sepia",   bg: "#f5efe0",  title: "Sepia"   },
+];
+const DARK_THEMES: { value: ReadingTheme; bg: string; title: string }[] = [
+  { value: "default", bg: "#3e2b1a",  title: "Default" },
+  { value: "warm",    bg: "#241509",  title: "Warm"    },
 ];
 
 function Btn({
@@ -67,8 +71,9 @@ function Sep() {
 
 export function EditorToolbar({
   editor, editMode, onToggleEdit, syncState, onSync, sidebarOpen, onToggleSidebar,
-  fontSize, onFontSizeChange, readingTheme, onReadingThemeChange,
+  fontSize, onFontSizeChange, readingTheme, onReadingThemeChange, resolvedTheme,
 }: Props) {
+  const themes = resolvedTheme === "dark" ? DARK_THEMES : LIGHT_THEMES;
   const words = editor.storage.characterCount?.words() ?? 0;
 
   const headingValue =
@@ -158,7 +163,7 @@ export function EditorToolbar({
 
         {/* Reading theme swatches */}
         <div className="flex items-center gap-1">
-          {READING_THEMES.map(({ value, bg, title }) => (
+          {themes.map(({ value, bg, title }) => (
             <button
               key={value}
               type="button"
