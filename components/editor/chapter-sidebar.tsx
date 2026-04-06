@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor,
   useSensor, useSensors, type DragEndEvent,
@@ -112,8 +112,15 @@ interface Props {
 export function ChapterSidebar({
   novelId, chapterOrder: initial, chapterTitles, activeSlug, open, onClose,
 }: Props) {
-  const [chapters, setChapters] = useState(initial);
+  const [chapters, setChapters]     = useState(initial);
+  const [creating, setCreating]     = useState(false);
+  const [newTitle, setNewTitle]     = useState("");
+  const newInputRef                 = useRef<HTMLInputElement>(null);
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor));
+
+  useEffect(() => {
+    if (creating) newInputRef.current?.focus();
+  }, [creating]);
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -125,11 +132,19 @@ export function ChapterSidebar({
     await reorderChapters(novelId, reordered);
   }
 
-  async function handleNewChapter() {
-    const title = window.prompt("Chapter title:");
-    if (!title) return;
-    const slug = await createChapter(novelId, title);
-    setChapters((prev) => [...prev, slug]);
+  async function commitNewChapter() {
+    const title = newTitle.trim();
+    if (title) {
+      const slug = await createChapter(novelId, title);
+      setChapters((prev) => [...prev, slug]);
+    }
+    setNewTitle("");
+    setCreating(false);
+  }
+
+  function handleNewChapter() {
+    setNewTitle("");
+    setCreating(true);
   }
 
   function prettySlug(slug: string) {
@@ -197,6 +212,27 @@ export function ChapterSidebar({
           </div>
         </SortableContext>
       </DndContext>
+
+      {/* New chapter inline input */}
+      {creating && (
+        <div className="px-3 py-2 border-t border-[var(--border-default)] shrink-0">
+          <div className="flex items-center gap-1">
+            <input
+              ref={newInputRef}
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitNewChapter();
+                if (e.key === "Escape") { setCreating(false); setNewTitle(""); }
+              }}
+              placeholder="Chapter title…"
+              className="flex-1 min-w-0 bg-transparent border-b border-[var(--accent)] outline-none text-sm text-[var(--text-primary)] py-0.5 placeholder:text-[var(--text-muted)]"
+            />
+            <button onClick={commitNewChapter} aria-label="Confirm" className="text-[var(--status-writing)] shrink-0"><Check size={12} /></button>
+            <button onClick={() => { setCreating(false); setNewTitle(""); }} aria-label="Cancel" className="text-[var(--text-muted)] shrink-0"><X size={12} /></button>
+          </div>
+        </div>
+      )}
 
       {/* Double-click hint */}
       <p className="px-3 py-2 text-[10px] text-[var(--text-muted)] border-t border-[var(--border-default)] shrink-0">
