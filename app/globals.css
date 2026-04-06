@@ -250,6 +250,24 @@ body {
   user-select: text;
 }
 
+/* Reader font size — controlled via CSS variable set on the scroll container */
+.tiptap.prose {
+  font-size: var(--reader-font-size, 19px);
+  line-height: 1.8;
+}
+
+/* Reading theme overrides — scoped to the scroll container, cascade into .tiptap */
+[data-reading-theme="sepia"] {
+  --bg-editor:      #f5efe0;
+  --text-primary:   #2d1f0f;
+  --border-default: #d9c5a0;
+}
+[data-reading-theme="night"] {
+  --bg-editor:      #141414;
+  --text-primary:   #d9d0c4;
+  --border-default: #2e2e2e;
+}
+
 /* Prose dark-mode overrides tied to our tokens */
 .dark .tiptap.prose {
   --tw-prose-body:        var(--text-primary);

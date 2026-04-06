@@ -9,6 +9,7 @@ import Typography from "@tiptap/extension-typography";
 import CharacterCount from "@tiptap/extension-character-count";
 import { useDebouncedCallback } from "use-debounce";
 import { saveDraft, loadDraft, clearDraft } from "@/lib/local-draft";
+import { loadReaderPrefs, saveReaderPrefs, type FontSize, type ReadingTheme } from "@/lib/reader-prefs";
 import { syncChapter } from "@/app/(editor)/edit/[novelId]/[chapterSlug]/actions";
 import { DraftRestoreDialog } from "./draft-restore-dialog";
 import { SyncStatusBanner } from "./sync-status-banner";
@@ -32,6 +33,8 @@ export function EditorClient({
   const [syncState, setSyncState]     = useState<SyncState>("idle");
   const [showRestore, setShowRestore] = useState(false);
   const [draftDate, setDraftDate]     = useState("");
+  const [fontSize, setFontSize]       = useState<FontSize>("md");
+  const [readingTheme, setReadingTheme] = useState<ReadingTheme>("default");
 
   // Keep a ref to latest markdown for sync — avoids stale closure in keydown handler
   const latestMd = useRef(initialContent);
@@ -60,7 +63,6 @@ export function EditorClient({
     editorProps: {
       attributes: {
         class: "tiptap prose prose-lg dark:prose-invert max-w-none focus:outline-none font-serif",
-        style: "font-size:19px;line-height:1.8;",
         spellCheck: "true",
       },
     },
@@ -90,6 +92,13 @@ export function EditorClient({
       setTimeout(() => editor.commands.focus(), 10);
     }
   }, [editor, editMode]);
+
+  // Load reader preferences on mount
+  useEffect(() => {
+    const prefs = loadReaderPrefs();
+    setFontSize(prefs.fontSize);
+    setReadingTheme(prefs.readingTheme);
+  }, []);
 
   // Check for a newer local draft on mount
   useEffect(() => {
@@ -143,12 +152,20 @@ export function EditorClient({
         onSync={handleSync}
         sidebarOpen={sidebarOpen}
         onToggleSidebar={onToggleSidebar}
+        fontSize={fontSize}
+        onFontSizeChange={(s) => { setFontSize(s); saveReaderPrefs({ fontSize: s, readingTheme }); }}
+        readingTheme={readingTheme}
+        onReadingThemeChange={(t) => { setReadingTheme(t); saveReaderPrefs({ fontSize, readingTheme: t }); }}
       />
 
       {/* Scrollable document area */}
       <div
         className="flex-1 overflow-y-auto"
-        style={{ background: "var(--bg-editor)" }}
+        data-reading-theme={readingTheme}
+        style={{
+          background: "var(--bg-editor)",
+          "--reader-font-size": { sm: "16px", md: "19px", lg: "22px", xl: "26px" }[fontSize],
+        } as React.CSSProperties}
         // Only focus-end when clicking the *padding area* below the text,
         // not when clicking inside the editor itself (those events bubble up).
         onClick={(e) => {

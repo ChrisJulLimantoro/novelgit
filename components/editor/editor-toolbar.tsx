@@ -7,18 +7,31 @@ import {
   GitBranch, Eye, Pencil, PanelLeftOpen, PanelLeftClose,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { FontSize, ReadingTheme } from "@/lib/reader-prefs";
 
 type SyncState = "idle" | "syncing" | "success" | "error";
 
 interface Props {
-  editor:          Editor;
-  editMode:        boolean;
-  onToggleEdit:    () => void;
-  syncState:       SyncState;
-  onSync:          () => void;
-  sidebarOpen:     boolean;
-  onToggleSidebar: () => void;
+  editor:              Editor;
+  editMode:            boolean;
+  onToggleEdit:        () => void;
+  syncState:           SyncState;
+  onSync:              () => void;
+  sidebarOpen:         boolean;
+  onToggleSidebar:     () => void;
+  fontSize:            FontSize;
+  onFontSizeChange:    (s: FontSize) => void;
+  readingTheme:        ReadingTheme;
+  onReadingThemeChange:(t: ReadingTheme) => void;
 }
+
+const FONT_SIZES: FontSize[] = ["sm", "md", "lg", "xl"];
+
+const READING_THEMES: { value: ReadingTheme; bg: string; title: string }[] = [
+  { value: "default", bg: "var(--bg-editor)",  title: "Default" },
+  { value: "sepia",   bg: "#f5efe0",            title: "Sepia"   },
+  { value: "night",   bg: "#141414",            title: "Night"   },
+];
 
 function Btn({
   onClick, active = false, disabled = false, title, children,
@@ -54,6 +67,7 @@ function Sep() {
 
 export function EditorToolbar({
   editor, editMode, onToggleEdit, syncState, onSync, sidebarOpen, onToggleSidebar,
+  fontSize, onFontSizeChange, readingTheme, onReadingThemeChange,
 }: Props) {
   const words = editor.storage.characterCount?.words() ?? 0;
 
@@ -61,6 +75,8 @@ export function EditorToolbar({
     editor.isActive("heading", { level: 1 }) ? "h1" :
     editor.isActive("heading", { level: 2 }) ? "h2" :
     editor.isActive("heading", { level: 3 }) ? "h3" : "p";
+
+  const currentSizeIdx = FONT_SIZES.indexOf(fontSize);
 
   return (
     <div className="flex items-center gap-0.5 px-3 py-1.5 border-b border-[var(--border-default)] bg-[var(--bg-elevated)] overflow-x-auto shrink-0">
@@ -117,6 +133,50 @@ export function EditorToolbar({
         <span className="font-mono text-xs text-[var(--text-muted)] hidden sm:inline select-none">
           {words.toLocaleString()} words
         </span>
+
+        <Sep />
+
+        {/* Font size controls */}
+        <div className="flex items-center gap-0.5">
+          <Btn
+            onClick={() => onFontSizeChange(FONT_SIZES[currentSizeIdx - 1])}
+            disabled={currentSizeIdx === 0}
+            title="Decrease text size"
+          >
+            <span className="font-serif text-[11px] font-semibold leading-none">A−</span>
+          </Btn>
+          <Btn
+            onClick={() => onFontSizeChange(FONT_SIZES[currentSizeIdx + 1])}
+            disabled={currentSizeIdx === FONT_SIZES.length - 1}
+            title="Increase text size"
+          >
+            <span className="font-serif text-[13px] font-semibold leading-none">A+</span>
+          </Btn>
+        </div>
+
+        <Sep />
+
+        {/* Reading theme swatches */}
+        <div className="flex items-center gap-1">
+          {READING_THEMES.map(({ value, bg, title }) => (
+            <button
+              key={value}
+              type="button"
+              title={title}
+              onClick={() => onReadingThemeChange(value)}
+              className={cn(
+                "w-4 h-4 rounded-full border transition-all shrink-0",
+                readingTheme === value
+                  ? "ring-2 ring-offset-1 ring-[var(--accent)] border-[var(--accent)]"
+                  : "border-[var(--border-default)] hover:border-[var(--text-muted)]",
+              )}
+              style={{ background: bg }}
+            />
+          ))}
+        </div>
+
+        <Sep />
+
         <button
           onClick={onSync}
           disabled={syncState === "syncing"}
