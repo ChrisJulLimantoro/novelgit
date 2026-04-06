@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Markdown } from "tiptap-markdown";
@@ -35,6 +35,7 @@ export function EditorClient({
 
   // Keep a ref to latest markdown for sync — avoids stale closure in keydown handler
   const latestMd = useRef(initialContent);
+  const syncInFlightRef = useRef(false);
 
   const autosave = useDebouncedCallback((md: string) => {
     saveDraft(novelId, chapterSlug, md);
@@ -99,7 +100,9 @@ export function EditorClient({
     }
   }, [novelId, chapterSlug, fetchedAt]);
 
-  async function handleSync() {
+  const handleSync = useCallback(async () => {
+    if (syncInFlightRef.current) return;
+    syncInFlightRef.current = true;
     setSyncState("syncing");
     try {
       await syncChapter(novelId, chapterSlug, latestMd.current);
@@ -107,15 +110,17 @@ export function EditorClient({
       setSyncState("success");
     } catch {
       setSyncState("error");
+    } finally {
+      syncInFlightRef.current = false;
     }
-  }
+  }, [novelId, chapterSlug]);
 
   // Keyboard shortcuts
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") {
         e.preventDefault();
-        handleSync();
+        if (!syncInFlightRef.current) void handleSync();
       }
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "r") {
         e.preventDefault();
@@ -124,8 +129,7 @@ export function EditorClient({
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [handleSync]);
 
   if (!editor) return null;
 

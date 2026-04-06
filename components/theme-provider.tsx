@@ -38,6 +38,18 @@ function applyClass(resolved: ResolvedTheme) {
   document.documentElement.classList.toggle("dark", resolved === "dark");
 }
 
+function readInitialResolved(defaultTheme: Theme): ResolvedTheme {
+  if (typeof window === "undefined") return "light";
+  try {
+    if (document.documentElement.classList.contains("dark")) return "dark";
+    const stored = localStorage.getItem("theme") as Theme | null;
+    const t = stored ?? defaultTheme;
+    return resolve(t);
+  } catch {
+    return "light";
+  }
+}
+
 export function ThemeProvider({
   children,
   defaultTheme = "system",
@@ -46,7 +58,9 @@ export function ThemeProvider({
   defaultTheme?: Theme;
 }) {
   const [theme, setThemeState] = useState<Theme>(defaultTheme);
-  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>("light");
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
+    readInitialResolved(defaultTheme),
+  );
 
   const applyTheme = useCallback(
     (t: Theme) => {

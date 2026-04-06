@@ -28,6 +28,6 @@ export async function putFile(
     path,
     message,
     content: Buffer.from(content).toString("base64"),
-    sha:     sha || undefined,
+    sha:     sha !== "" ? sha : undefined,
   });
 }

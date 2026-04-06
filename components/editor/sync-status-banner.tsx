@@ -36,7 +36,7 @@ export function SyncStatusBanner({ state, onRetry }: Props) {
       )}
       {state === "success" && (
         <span className="text-[var(--status-writing)]">
-          Saved to GitHub. Page will refresh in ~{Math.max(0, 45 - seconds)}s.
+          Saved to GitHub.{seconds > 0 && ` ${seconds}s ago`}
         </span>
       )}
       {state === "error" && (

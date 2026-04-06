@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isValidAuthCookie } from "@/lib/auth";
 
 export function proxy(request: NextRequest) {
   const token = request.cookies.get("auth_token")?.value;
-  if (token !== process.env.AUTH_SECRET) {
+  if (!isValidAuthCookie(token)) {
     const from = request.nextUrl.pathname + request.nextUrl.search;
-    const url  = new URL("/login", request.url);
-    url.searchParams.set("from", encodeURIComponent(from));
+    const url = new URL("/", request.url);
+    url.searchParams.set("from", from);
     return NextResponse.redirect(url);
   }
   return NextResponse.next();

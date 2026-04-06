@@ -26,6 +26,7 @@ function SortableChapter({ slug, novelId, isActive, displayTitle }: SortableProp
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: slug });
   const [editing, setEditing]   = useState(false);
   const [draft, setDraft]       = useState(displayTitle);
+  const [renameError, setRenameError] = useState<string | null>(null);
   const inputRef                = useRef<HTMLInputElement>(null);
 
   const style = {
@@ -35,14 +36,22 @@ function SortableChapter({ slug, novelId, isActive, displayTitle }: SortableProp
   };
 
   async function commitRename() {
+    setRenameError(null);
     const trimmed = draft.trim();
-    if (trimmed && trimmed !== displayTitle) {
-      await renameChapterTitle(novelId, slug, trimmed);
+    if (!trimmed || trimmed === displayTitle) {
+      setEditing(false);
+      return;
     }
-    setEditing(false);
+    try {
+      await renameChapterTitle(novelId, slug, trimmed);
+      setEditing(false);
+    } catch {
+      setRenameError("Could not save. Try again.");
+    }
   }
 
   function startEditing() {
+    setRenameError(null);
     setDraft(displayTitle);
     setEditing(true);
     setTimeout(() => inputRef.current?.select(), 0);
@@ -77,13 +86,16 @@ function SortableChapter({ slug, novelId, isActive, displayTitle }: SortableProp
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") commitRename();
+              if (e.key === "Enter") void commitRename();
               if (e.key === "Escape") setEditing(false);
             }}
             className="flex-1 min-w-0 bg-transparent border-b border-[var(--accent)] outline-none text-sm text-[var(--text-primary)] py-0.5"
             autoFocus
           />
-          <button onClick={commitRename} className="text-[var(--status-writing)] shrink-0"><Check size={12} /></button>
+          {renameError && (
+            <p className="text-[10px] text-destructive shrink-0 max-w-[8rem]">{renameError}</p>
+          )}
+          <button type="button" onClick={() => void commitRename()} className="text-[var(--status-writing)] shrink-0"><Check size={12} /></button>
           <button onClick={() => setEditing(false)} className="text-[var(--text-muted)] shrink-0"><X size={12} /></button>
         </div>
       ) : (
@@ -115,6 +127,7 @@ export function ChapterSidebar({
   const [chapters, setChapters]     = useState(initial);
   const [creating, setCreating]     = useState(false);
   const [newTitle, setNewTitle]     = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
   const newInputRef                 = useRef<HTMLInputElement>(null);
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor));
 
@@ -127,22 +140,37 @@ export function ChapterSidebar({
     if (!over || active.id === over.id) return;
     const oldIndex = chapters.indexOf(active.id as string);
     const newIndex = chapters.indexOf(over.id as string);
+    const prev = chapters;
     const reordered = arrayMove(chapters, oldIndex, newIndex);
     setChapters(reordered);
-    await reorderChapters(novelId, reordered);
+    try {
+      await reorderChapters(novelId, reordered);
+    } catch {
+      setChapters(prev);
+      console.warn("Reorder failed; list reverted.");
+    }
   }
 
   async function commitNewChapter() {
+    setCreateError(null);
     const title = newTitle.trim();
-    if (title) {
-      const slug = await createChapter(novelId, title);
-      setChapters((prev) => [...prev, slug]);
+    if (!title) {
+      setNewTitle("");
+      setCreating(false);
+      return;
     }
-    setNewTitle("");
-    setCreating(false);
+    try {
+      const slug = await createChapter(novelId, title);
+      setChapters((p) => [...p, slug]);
+      setNewTitle("");
+      setCreating(false);
+    } catch {
+      setCreateError("Could not create chapter.");
+    }
   }
 
   function handleNewChapter() {
+    setCreateError(null);
     setNewTitle("");
     setCreating(true);
   }
@@ -222,15 +250,18 @@ export function ChapterSidebar({
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") commitNewChapter();
-                if (e.key === "Escape") { setCreating(false); setNewTitle(""); }
+                if (e.key === "Enter") void commitNewChapter();
+                if (e.key === "Escape") { setCreating(false); setNewTitle(""); setCreateError(null); }
               }}
               placeholder="Chapter title…"
               className="flex-1 min-w-0 bg-transparent border-b border-[var(--accent)] outline-none text-sm text-[var(--text-primary)] py-0.5 placeholder:text-[var(--text-muted)]"
             />
-            <button onClick={commitNewChapter} aria-label="Confirm" className="text-[var(--status-writing)] shrink-0"><Check size={12} /></button>
-            <button onClick={() => { setCreating(false); setNewTitle(""); }} aria-label="Cancel" className="text-[var(--text-muted)] shrink-0"><X size={12} /></button>
+            <button type="button" onClick={() => void commitNewChapter()} aria-label="Confirm" className="text-[var(--status-writing)] shrink-0"><Check size={12} /></button>
+            <button type="button" onClick={() => { setCreating(false); setNewTitle(""); setCreateError(null); }} aria-label="Cancel" className="text-[var(--text-muted)] shrink-0"><X size={12} /></button>
           </div>
+          {createError && (
+            <p className="text-[10px] text-destructive mt-1">{createError}</p>
+          )}
         </div>
       )}
 

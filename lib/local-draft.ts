@@ -18,7 +18,13 @@ export function saveDraft(novelId: string, chapterSlug: string, content: string)
 export function loadDraft(novelId: string, chapterSlug: string): Draft | null {
   if (typeof window === "undefined") return null;
   const raw = localStorage.getItem(draftKey(novelId, chapterSlug));
-  return raw ? JSON.parse(raw) : null;
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as Draft;
+  } catch {
+    localStorage.removeItem(draftKey(novelId, chapterSlug));
+    return null;
+  }
 }
 
 export function clearDraft(novelId: string, chapterSlug: string): void {
