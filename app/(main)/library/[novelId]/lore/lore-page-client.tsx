@@ -10,7 +10,13 @@ import remarkGfm from "remark-gfm";
 import { LoreEntryForm } from "@/components/lore/lore-entry-form";
 import { LoreTypeIcon } from "@/components/lore/lore-type-icon";
 import { getLoreEntryAction, deleteLoreEntryAction, listLoreEntriesAction } from "./actions";
-import { LORE_TYPES } from "@/types/lore";
+import {
+  LORE_CLUSTERS,
+  LORE_TYPE_LABELS,
+  typesInCluster,
+  clusterForType,
+  type LoreClusterFilter,
+} from "@/lib/lore-categories";
 import type { LoreType, LoreEntry } from "@/types/lore";
 
 type EntryStub = { id: string; type: LoreType; name: string; tags: string[]; updatedAt: string };
@@ -34,24 +40,49 @@ interface Props {
 
 export function LorePageClient({ novelId, initialEntries, initialEntryId }: Props) {
   const router = useRouter();
-  const [entries, setEntries]     = useState<EntryStub[]>(initialEntries);
-  const [typeFilter, setTypeFilter] = useState<LoreType | "all">("all");
-  const [search, setSearch]       = useState("");
+  const [entries, setEntries]       = useState<EntryStub[]>(initialEntries);
+  const [clusterFilter, setClusterFilter] = useState<LoreClusterFilter>("all");
+  const [search, setSearch]         = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(initialEntryId ?? null);
-  const [viewMode, setViewMode]   = useState<ViewMode>(initialEntryId ? "detail" : "list");
+  const [viewMode, setViewMode]     = useState<ViewMode>(initialEntryId ? "detail" : "list");
   const [activeEntry, setActiveEntry] = useState<LoreEntry | null>(null);
   const [loadingEntry, setLoadingEntry] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [isDeleting, startDelete]  = useTransition();
+  const [createPreset, setCreatePreset] = useState<LoreType | null>(null);
 
   const filtered = useMemo(() => {
+    const allowed = typesInCluster(clusterFilter);
     return entries.filter((e) => {
-      const matchType = typeFilter === "all" || e.type === typeFilter;
+      const matchCluster = !allowed || allowed.includes(e.type);
       const q = search.toLowerCase();
       const matchSearch = !q || e.name.toLowerCase().includes(q) || e.tags.some((t) => t.includes(q));
-      return matchType && matchSearch;
+      return matchCluster && matchSearch;
     });
-  }, [entries, typeFilter, search]);
+  }, [entries, clusterFilter, search]);
+
+  const groupedSections = useMemo(() => {
+    const q = search.trim();
+    return LORE_CLUSTERS.map((cluster) => ({
+      cluster,
+      entries: filtered.filter((e) => cluster.types.includes(e.type)),
+    })).filter(({ cluster, entries: list }) => {
+      if (clusterFilter !== "all") {
+        const allowed = typesInCluster(clusterFilter);
+        if (!allowed) return false;
+        return cluster.types.some((t) => allowed.includes(t));
+      }
+      if (q) return list.length > 0;
+      return true;
+    });
+  }, [filtered, clusterFilter, search]);
+
+  function openCreate(preset: LoreType | null) {
+    setSelectedId(null);
+    setActiveEntry(null);
+    setCreatePreset(preset);
+    setViewMode("create");
+  }
 
   async function selectEntry(id: string) {
     setSelectedId(id);
@@ -67,6 +98,7 @@ export function LorePageClient({ novelId, initialEntries, initialEntryId }: Prop
   }
 
   async function handleCreateSuccess(slug: string) {
+    setCreatePreset(null);
     setSelectedId(slug);
     setViewMode("detail");
     setLoadingEntry(true);
@@ -122,40 +154,46 @@ export function LorePageClient({ novelId, initialEntries, initialEntryId }: Prop
 
   return (
     <div className="flex gap-6 min-h-[60vh]">
-      {/* ── Left: Entry list ─────────────────────────────────── */}
+      {/* ── Left: clustered list ───────────────────────────── */}
       <div className={cn(
-        "flex flex-col gap-3 shrink-0",
-        "w-full md:w-[300px]",
-        // On mobile, hide list when in detail/edit/create
+        "flex flex-col gap-4 shrink-0",
+        "w-full md:w-[320px]",
         (showDetail || showEdit || showCreate) && "hidden md:flex",
       )}>
-        {/* Type filter */}
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            onClick={() => setTypeFilter("all")}
-            className={cn(
-              "px-2.5 py-0.5 rounded-full text-xs border transition-all duration-150",
-              typeFilter === "all"
-                ? "bg-[var(--accent)]/10 border-[var(--accent)] text-[var(--accent)] font-medium"
-                : "border-[var(--border-default)] text-[var(--text-muted)] hover:border-[var(--accent)]/50",
-            )}
-          >
-            All
-          </button>
-          {LORE_TYPES.map((t) => (
+        {/* Cluster filter */}
+        <div className="flex flex-col gap-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+            Show
+          </p>
+          <div className="flex flex-wrap gap-1.5">
             <button
-              key={t}
-              onClick={() => setTypeFilter(t)}
+              type="button"
+              onClick={() => setClusterFilter("all")}
               className={cn(
-                "px-2.5 py-0.5 rounded-full text-xs border transition-all duration-150 capitalize",
-                typeFilter === t
+                "px-2.5 py-1 rounded-lg text-xs border transition-all duration-150",
+                clusterFilter === "all"
                   ? "bg-[var(--accent)]/10 border-[var(--accent)] text-[var(--accent)] font-medium"
                   : "border-[var(--border-default)] text-[var(--text-muted)] hover:border-[var(--accent)]/50",
               )}
             >
-              {t}
+              All
             </button>
-          ))}
+            {LORE_CLUSTERS.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setClusterFilter(c.id)}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg text-xs border transition-all duration-150 font-medium",
+                  clusterFilter === c.id
+                    ? "bg-[var(--accent)]/10 border-[var(--accent)] text-[var(--accent)]"
+                    : "border-[var(--border-default)] text-[var(--text-muted)] hover:border-[var(--accent)]/50",
+                )}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Search */}
@@ -164,89 +202,143 @@ export function LorePageClient({ novelId, initialEntries, initialEntryId }: Prop
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search lore…"
-            className="w-full h-8 pl-8 pr-3 rounded-lg border border-[var(--border-default)] bg-[var(--bg-elevated)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] transition-colors"
+            placeholder="Search names and tags…"
+            className="w-full h-9 pl-8 pr-3 rounded-lg border border-[var(--border-default)] bg-[var(--bg-elevated)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] transition-colors"
           />
         </div>
 
-        {/* New entry button */}
-        <Button
-          size="sm"
-          className="w-full"
-          onClick={() => { setSelectedId(null); setActiveEntry(null); setViewMode("create"); }}
-        >
-          <Plus size={14} />
-          New Entry
-        </Button>
-
-        {/* List */}
-        <div className="flex flex-col gap-0.5">
-          {filtered.length === 0 ? (
+        {/* Grouped entries */}
+        <div className="flex flex-col gap-5 flex-1 min-h-0 overflow-y-auto pr-0.5 -mr-0.5">
+          {groupedSections.length === 0 ? (
             <p className="text-sm text-[var(--text-muted)] text-center py-8">
-              {entries.length === 0 ? "No lore entries yet." : "No results."}
+              No matching entries.
             </p>
           ) : (
-            filtered.map((entry) => (
-              <button
-                key={entry.id}
-                onClick={() => void selectEntry(entry.id)}
-                className={cn(
-                  "flex items-center gap-2.5 w-full text-left px-3 py-2.5 rounded-lg transition-colors",
-                  selectedId === entry.id
-                    ? "bg-[var(--accent)]/10 border-l-2 border-[var(--accent)] pl-[10px]"
-                    : "hover:bg-[var(--bg-sidebar)]",
-                )}
+            groupedSections.map(({ cluster, entries: sectionEntries }) => (
+              <section
+                key={cluster.id}
+                className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)]/60 overflow-hidden"
               >
-                <LoreTypeIcon type={entry.type} size={13} className="text-[var(--text-muted)] shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[var(--text-primary)] truncate">{entry.name}</p>
-                  <p className="text-[10px] text-[var(--text-muted)] capitalize">{entry.type} · {relativeDate(entry.updatedAt)}</p>
+                <div className="px-3 pt-3 pb-2 border-b border-[var(--border-default)]/80 bg-[var(--bg-sidebar)]/40">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h2 className="text-sm font-semibold text-[var(--text-primary)] tracking-tight">
+                        {cluster.label}
+                      </h2>
+                      <p className="text-[10px] text-[var(--text-muted)] leading-snug mt-0.5">
+                        {cluster.blurb}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mt-2.5">
+                    {cluster.types.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => openCreate(t)}
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-medium transition-colors",
+                          "border-[var(--accent)]/35 text-[var(--accent)] bg-[var(--accent)]/5",
+                          "hover:bg-[var(--accent)]/12 hover:border-[var(--accent)]/55",
+                        )}
+                      >
+                        <Plus size={11} strokeWidth={2.5} />
+                        New {LORE_TYPE_LABELS[t]}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </button>
+                <div className="flex flex-col py-1">
+                  {sectionEntries.length === 0 ? (
+                    <p className="text-xs text-[var(--text-muted)] px-3 py-4 text-center">
+                      No {cluster.label.toLowerCase()} yet — use the buttons above.
+                    </p>
+                  ) : (
+                    sectionEntries.map((entry) => (
+                      <button
+                        key={entry.id}
+                        type="button"
+                        onClick={() => void selectEntry(entry.id)}
+                        className={cn(
+                          "flex items-center gap-2.5 w-full text-left px-3 py-2.5 transition-colors",
+                          selectedId === entry.id
+                            ? "bg-[var(--accent)]/10 border-l-2 border-[var(--accent)] pl-[10px]"
+                            : "hover:bg-[var(--bg-sidebar)]/80",
+                        )}
+                      >
+                        <LoreTypeIcon type={entry.type} size={13} className="text-[var(--text-muted)] shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-[var(--text-primary)] truncate">{entry.name}</p>
+                          <p className="text-[10px] text-[var(--text-muted)]">
+                            {LORE_TYPE_LABELS[entry.type]} · {relativeDate(entry.updatedAt)}
+                          </p>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </section>
             ))
           )}
         </div>
+
+        <p className="text-[10px] text-[var(--text-muted)] leading-relaxed">
+          Entries are grouped as <strong className="text-[var(--text-primary)] font-medium">Characters</strong>,{" "}
+          <strong className="text-[var(--text-primary)] font-medium">World</strong> (locations and items),{" "}
+          <strong className="text-[var(--text-primary)] font-medium">Factions</strong>, and{" "}
+          <strong className="text-[var(--text-primary)] font-medium">Events</strong>.
+        </p>
       </div>
 
       {/* ── Right: Detail / Edit / Create ───────────────────── */}
       <div className={cn(
         "flex-1 min-w-0 rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)]",
-        // Mobile: show only when not in list mode
         !showDetail && !showEdit && !showCreate && "hidden md:flex",
         "flex flex-col",
       )}>
 
-        {/* ── Empty state ── */}
         {!showDetail && !showEdit && !showCreate && (
           <div className="flex flex-col items-center justify-center gap-4 flex-1 text-center px-8 py-16">
             <BookOpen size={40} className="text-[var(--text-muted)] opacity-30" />
             <div>
               <p className="font-serif text-lg text-[var(--text-primary)] mb-1">Select an entry</p>
-              <p className="text-sm text-[var(--text-muted)]">Or create your first lore entry to start building your world.</p>
+              <p className="text-sm text-[var(--text-muted)] max-w-sm mx-auto">
+                Pick something from the left, or start with <strong className="text-[var(--text-primary)] font-medium">New …</strong> under the right category.
+              </p>
             </div>
-            <Button size="sm" onClick={() => setViewMode("create")}>
+            <Button size="sm" variant="outline" onClick={() => openCreate(null)}>
               <Plus size={14} />
-              New Entry
+              New entry (choose type)
             </Button>
           </div>
         )}
 
-        {/* ── Create mode ── */}
         {showCreate && (
           <div className="p-6 overflow-y-auto">
-            <h2 className="font-serif text-xl font-semibold text-[var(--text-primary)] mb-6">New Lore Entry</h2>
+            <h2 className="font-serif text-xl font-semibold text-[var(--text-primary)] mb-1">
+              {createPreset ? `New ${LORE_TYPE_LABELS[createPreset]}` : "New lore entry"}
+            </h2>
+            <p className="text-sm text-[var(--text-muted)] mb-6">
+              {createPreset
+                ? `This will be saved as ${LORE_TYPE_LABELS[createPreset].toLowerCase()} lore under ${clusterForType(createPreset).label}.`
+                : "Choose a type below, then name your entry and add details."}
+            </p>
             <LoreEntryForm
+              key={createPreset ?? "free"}
               novelId={novelId}
+              presetType={createPreset ?? undefined}
               onSuccess={handleCreateSuccess}
-              onCancel={() => setViewMode(selectedId ? "detail" : "list")}
+              onCancel={() => {
+                setCreatePreset(null);
+                setViewMode(selectedId ? "detail" : "list");
+              }}
             />
           </div>
         )}
 
-        {/* ── Edit mode ── */}
         {showEdit && activeEntry && (
           <div className="p-6 overflow-y-auto">
-            <h2 className="font-serif text-xl font-semibold text-[var(--text-primary)] mb-6">Edit Entry</h2>
+            <h2 className="font-serif text-xl font-semibold text-[var(--text-primary)] mb-6">Edit entry</h2>
             <LoreEntryForm
               novelId={novelId}
               initial={activeEntry}
@@ -256,12 +348,11 @@ export function LorePageClient({ novelId, initialEntries, initialEntryId }: Prop
           </div>
         )}
 
-        {/* ── Detail mode ── */}
         {showDetail && (
           <div className="flex flex-col flex-1 overflow-hidden">
-            {/* Mobile back */}
             <div className="md:hidden px-5 pt-4">
               <button
+                type="button"
                 onClick={() => { setSelectedId(null); setViewMode("list"); }}
                 className="inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
               >
@@ -276,18 +367,19 @@ export function LorePageClient({ novelId, initialEntries, initialEntryId }: Prop
               </div>
             ) : activeEntry ? (
               <div className="flex flex-col flex-1 overflow-hidden">
-                {/* Header */}
                 <div className="flex items-start justify-between gap-4 px-6 pt-5 pb-4 border-b border-[var(--border-default)]">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <LoreTypeIcon type={activeEntry.type} size={16} className="text-[var(--text-muted)] shrink-0 mt-0.5" />
+                    <LoreTypeIcon type={activeEntry.type} size={16} className="text-[var(--accent)] shrink-0 mt-0.5" />
                     <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-0.5">
+                        {clusterForType(activeEntry.type).label} · {LORE_TYPE_LABELS[activeEntry.type]}
+                      </p>
                       <h2 className="font-serif text-xl font-semibold text-[var(--text-primary)] leading-snug">
                         {activeEntry.name}
                       </h2>
-                      <p className="text-xs text-[var(--text-muted)] mt-0.5 capitalize">
-                        {activeEntry.type}
-                        {activeEntry.tags.length > 0 && ` · ${activeEntry.tags.join(", ")}`}
-                        {activeEntry.created && ` · ${activeEntry.created}`}
+                      <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                        {activeEntry.tags.length > 0 && `${activeEntry.tags.join(", ")} · `}
+                        {activeEntry.created}
                       </p>
                     </div>
                   </div>
@@ -316,7 +408,6 @@ export function LorePageClient({ novelId, initialEntries, initialEntryId }: Prop
                   <p className="px-6 pt-3 text-xs text-destructive">{deleteError}</p>
                 )}
 
-                {/* Body */}
                 <div className="flex-1 overflow-y-auto px-6 py-5">
                   {activeEntry.body ? (
                     <div className="prose prose-sm max-w-none dark:prose-invert text-[var(--text-primary)]">

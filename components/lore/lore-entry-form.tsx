@@ -5,20 +5,24 @@ import { Sparkles, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { LoreScaffoldPreview } from "./lore-scaffold-preview";
+import { LoreTypeIcon } from "./lore-type-icon";
+import { LORE_TYPE_LABELS } from "@/lib/lore-categories";
 import { createLoreEntry, updateLoreEntry } from "@/app/(main)/library/[novelId]/lore/actions";
 import { LORE_TYPES } from "@/types/lore";
 import type { LoreType, LoreEntry } from "@/types/lore";
 
 interface Props {
-  novelId:   string;
-  initial?:  LoreEntry;
-  onSuccess: (slug: string) => void;
-  onCancel:  () => void;
+  novelId:     string;
+  initial?:    LoreEntry;
+  /** Create only: lock type and skip the type picker. */
+  presetType?: LoreType;
+  onSuccess:   (slug: string) => void;
+  onCancel:    () => void;
 }
 
-export function LoreEntryForm({ novelId, initial, onSuccess, onCancel }: Props) {
+export function LoreEntryForm({ novelId, initial, presetType, onSuccess, onCancel }: Props) {
   const [name, setName]           = useState(initial?.name ?? "");
-  const [type, setType]           = useState<LoreType | "">(initial?.type ?? "");
+  const [type, setType]           = useState<LoreType | "">(initial?.type ?? presetType ?? "");
   const [tags, setTags]           = useState<string[]>(initial?.tags ?? []);
   const [body, setBody]           = useState(initial?.body ?? "");
   const [tagInput, setTagInput]   = useState("");
@@ -30,6 +34,7 @@ export function LoreEntryForm({ novelId, initial, onSuccess, onCancel }: Props) 
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   const isEdit = !!initial;
+  const typeLocked = !isEdit && !!presetType;
   const canSubmit = name.trim().length > 0 && type !== "";
 
   function addTag(raw: string) {
@@ -125,28 +130,41 @@ export function LoreEntryForm({ novelId, initial, onSuccess, onCancel }: Props) 
       </div>
 
       {/* Type */}
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-          Type
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {LORE_TYPES.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setType(t)}
-              className={cn(
-                "px-3 py-1 rounded-full text-xs border transition-all duration-150 capitalize select-none",
-                type === t
-                  ? "bg-[var(--accent)]/10 border-[var(--accent)] text-[var(--accent)] font-medium"
-                  : "border-[var(--border-default)] text-[var(--text-muted)] hover:border-[var(--accent)]/50 hover:text-[var(--text-primary)]",
-              )}
-            >
-              {t}
-            </button>
-          ))}
+      {typeLocked && presetType ? (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+            Category
+          </span>
+          <div className="inline-flex items-center gap-2.5 w-fit px-3 py-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-sidebar)] text-sm text-[var(--text-primary)]">
+            <LoreTypeIcon type={presetType} size={16} className="text-[var(--accent)] shrink-0" />
+            <span className="font-medium">{LORE_TYPE_LABELS[presetType]}</span>
+            <span className="text-[var(--text-muted)] text-xs font-normal">— chosen from the library sidebar</span>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+            Type
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {LORE_TYPES.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setType(t)}
+                className={cn(
+                  "px-3 py-1 rounded-full text-xs border transition-all duration-150 capitalize select-none",
+                  type === t
+                    ? "bg-[var(--accent)]/10 border-[var(--accent)] text-[var(--accent)] font-medium"
+                    : "border-[var(--border-default)] text-[var(--text-muted)] hover:border-[var(--accent)]/50 hover:text-[var(--text-primary)]",
+                )}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Tags */}
       <div className="flex flex-col gap-1.5">
