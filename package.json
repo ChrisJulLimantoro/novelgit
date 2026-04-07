@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "NODE_OPTIONS='--max-old-space-size=4096' next dev --no-turbopack",
+    "dev": "NODE_OPTIONS='--max-old-space-size=4096' next dev --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -28,6 +28,8 @@
     "cmdk": "^1.1.1",
     "docx": "^9.6.1",
     "framer-motion": "^12.38.0",
+    "gray-matter": "^4.0.3",
+    "groq-sdk": "^1.1.2",
     "lucide-react": "^1.7.0",
     "next": "16.2.2",
     "next-themes": "^0.4.6",

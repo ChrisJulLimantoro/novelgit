@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { WikiLinkExtension } from "./wikilink-extension";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Markdown } from "tiptap-markdown";
@@ -19,19 +20,25 @@ import { ChapterReadNav } from "./chapter-read-nav";
 import { cn } from "@/lib/utils";
 
 interface Props {
-  novelId:         string;
-  chapterSlug:     string;
-  chapterOrder:    string[];
-  initialContent:  string;
-  fetchedAt:       string;
-  sidebarOpen:     boolean;
-  onToggleSidebar: () => void;
+  novelId:          string;
+  chapterSlug:      string;
+  chapterOrder:     string[];
+  initialContent:   string;
+  fetchedAt:        string;
+  sidebarOpen:      boolean;
+  onToggleSidebar:  () => void;
+  loreSidebarOpen:  boolean;
+  onToggleLore:     () => void;
+  aiSidebarOpen:    boolean;
+  onToggleAi:       () => void;
+  onWikiLinkClick:  (name: string) => void;
 }
 
 type SyncState = "idle" | "syncing" | "success" | "error";
 
 export function EditorClient({
   novelId, chapterSlug, chapterOrder, initialContent, fetchedAt, sidebarOpen, onToggleSidebar,
+  loreSidebarOpen, onToggleLore, aiSidebarOpen, onToggleAi, onWikiLinkClick,
 }: Props) {
   const { resolvedTheme } = useTheme();
   const [editMode, setEditMode]       = useState(false); // read-first
@@ -44,15 +51,32 @@ export function EditorClient({
   // Keep a ref to latest markdown for sync — avoids stale closure in keydown handler
   const latestMd = useRef(initialContent);
   const syncInFlightRef = useRef(false);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
 
   const autosave = useDebouncedCallback((md: string) => {
     saveDraft(novelId, chapterSlug, md);
   }, 1500);
 
+  // DOM event delegation for WikiLink clicks
+  useEffect(() => {
+    const container = editorContainerRef.current;
+    if (!container) return;
+    const handler = (e: MouseEvent) => {
+      const target = (e.target as HTMLElement).closest("[data-wikilink]");
+      if (target instanceof HTMLElement) {
+        const name = target.getAttribute("data-wikilink");
+        if (name) onWikiLinkClick(name);
+      }
+    };
+    container.addEventListener("click", handler);
+    return () => container.removeEventListener("click", handler);
+  }, [onWikiLinkClick]);
+
   const editor = useEditor({
     immediatelyRender: false,  // required for Next.js SSR — prevents hydration mismatch
     extensions: [
       StarterKit,
+      WikiLinkExtension,
       Markdown.configure({
         html: false,
         tightLists: true,
@@ -158,7 +182,7 @@ export function EditorClient({
   if (!editor) return null;
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden min-w-0">
+    <div ref={editorContainerRef} className="flex flex-col flex-1 overflow-hidden min-w-0">
       <EditorToolbar
         editor={editor}
         editMode={editMode}
@@ -172,6 +196,10 @@ export function EditorClient({
         readingTheme={readingTheme}
         onReadingThemeChange={(t) => { setReadingTheme(t); saveReaderPrefs({ fontSize, readingTheme: t }); }}
         resolvedTheme={resolvedTheme}
+        loreSidebarOpen={loreSidebarOpen}
+        onToggleLore={onToggleLore}
+        aiSidebarOpen={aiSidebarOpen}
+        onToggleAi={onToggleAi}
       />
 
       {/* Scrollable document area */}

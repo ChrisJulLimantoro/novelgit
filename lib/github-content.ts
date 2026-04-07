@@ -1,6 +1,16 @@
 import { octokit } from "./github";
 import { REPO_OWNER, REPO_NAME } from "./config";
 
+export async function deleteFile(path: string, sha: string, message: string): Promise<void> {
+  await octokit.rest.repos.deleteFile({
+    owner: REPO_OWNER,
+    repo:  REPO_NAME,
+    path,
+    message,
+    sha,
+  });
+}
+
 export async function getFile(path: string): Promise<{ content: string; sha: string }> {
   const { data } = await octokit.rest.repos.getContent({
     owner: REPO_OWNER,

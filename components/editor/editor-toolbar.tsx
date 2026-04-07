@@ -6,6 +6,7 @@ import {
   Bold, Italic, Strikethrough,
   List, ListOrdered, Quote,
   GitBranch, Eye, Pencil, PanelLeftOpen, PanelLeftClose,
+  BookOpen, Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FontSize, ReadingTheme } from "@/lib/reader-prefs";
@@ -25,6 +26,10 @@ interface Props {
   readingTheme:        ReadingTheme;
   onReadingThemeChange:(t: ReadingTheme) => void;
   resolvedTheme:       "light" | "dark";
+  loreSidebarOpen:     boolean;
+  onToggleLore:        () => void;
+  aiSidebarOpen:       boolean;
+  onToggleAi:          () => void;
 }
 
 const FONT_SIZES: FontSize[] = ["sm", "md", "lg", "xl"];
@@ -73,6 +78,7 @@ function Sep() {
 export function EditorToolbar({
   editor, editMode, onToggleEdit, syncState, onSync, sidebarOpen, onToggleSidebar,
   fontSize, onFontSizeChange, readingTheme, onReadingThemeChange, resolvedTheme,
+  loreSidebarOpen, onToggleLore, aiSidebarOpen, onToggleAi,
 }: Props) {
   const themes = resolvedTheme === "dark" ? DARK_THEMES : LIGHT_THEMES;
 
@@ -185,6 +191,16 @@ export function EditorToolbar({
             />
           ))}
         </div>
+
+        <Sep />
+
+        {/* Lore + AI toggles */}
+        <Btn onClick={onToggleLore} active={loreSidebarOpen} title="Lore">
+          <BookOpen size={15} />
+        </Btn>
+        <Btn onClick={onToggleAi} active={aiSidebarOpen} title="Ask AI">
+          <Sparkles size={15} />
+        </Btn>
 
         <Sep />
 
