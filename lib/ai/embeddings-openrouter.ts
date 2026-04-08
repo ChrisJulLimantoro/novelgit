@@ -8,8 +8,6 @@ const MODEL = "nvidia/llama-nemotron-embed-vl-1b-v2:free";
 
 export const MANUSCRIPT_EMB_DIMS = 2048;
 
-type InputType = "search_document" | "search_query";
-
 interface OREmbeddingItem {
   embedding?: number[];
   index?: number;
@@ -102,19 +100,15 @@ async function postEmbeddings(input: string[]): Promise<number[][]> {
   return out;
 }
 
-export async function embedTextMs(
-  text: string,
-  // inputType kept for API compatibility but not sent — Nemotron ignores it
-  _inputType: InputType = "search_document",
-): Promise<number[]> {
+// Note: Nemotron does not support an `input_type` field — it returns an empty
+// `data` array when the field is present. Both functions below omit it.
+
+export async function embedTextMs(text: string): Promise<number[]> {
   const [vec] = await postEmbeddings([text]);
   return vec ?? [];
 }
 
-export async function embedBatchMs(
-  texts: string[],
-  _inputType: InputType = "search_document",
-): Promise<number[][]> {
+export async function embedBatchMs(texts: string[]): Promise<number[][]> {
   if (texts.length === 0) return [];
   return postEmbeddings(texts);
 }

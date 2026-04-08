@@ -34,7 +34,15 @@ export function verifySessionToken(token: string): boolean {
 export function isValidAuthCookie(token: string | undefined): boolean {
   if (!token) return false;
   if (verifySessionToken(token)) return true;
-  if (process.env.AUTH_SECRET && token === process.env.AUTH_SECRET) return true;
+  // Legacy path: old cookies stored the raw secret. Use constant-time compare to
+  // avoid timing-based side-channel leakage even on this deprecated code path.
+  if (process.env.AUTH_SECRET) {
+    try {
+      const a = Buffer.from(token);
+      const b = Buffer.from(process.env.AUTH_SECRET);
+      if (a.length === b.length && timingSafeEqual(a, b)) return true;
+    } catch { /* length mismatch or invalid input */ }
+  }
   return false;
 }
 

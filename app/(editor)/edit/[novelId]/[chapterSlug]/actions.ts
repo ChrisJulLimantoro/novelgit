@@ -6,29 +6,12 @@ import { countWords } from "@/lib/word-count";
 import { requireAuth } from "@/lib/auth";
 import { assertSafeChapterSlug, assertSafeNovelId } from "@/lib/ids";
 import {
-  chunkManuscriptMarkdown,
-  manuscriptChunkEmbedText,
   getManuscriptRagIndex,
   updateManuscriptRagIndex,
-  saveManuscriptEmbShard,
 } from "@/lib/manuscript-rag";
-import { embedBatchMs } from "@/lib/ai/embeddings-openrouter";
-
-function parseMeta(content: string): {
-  chapterOrder?:  string[];
-  chapterTitles?: Record<string, string>;
-} {
-  let o: unknown;
-  try {
-    o = JSON.parse(content);
-  } catch {
-    throw new Error("Invalid meta.json");
-  }
-  if (!o || typeof o !== "object" || Array.isArray(o)) {
-    throw new Error("Invalid meta.json");
-  }
-  return o as { chapterOrder?: string[]; chapterTitles?: Record<string, string> };
-}
+import { reindexSingleChapter } from "@/lib/ai/manuscript-reindex";
+import { todayISO } from "@/lib/utils";
+import { parseNovelMeta } from "@/lib/novel-meta";
 
 export async function loadChapter(novelId: string, chapterSlug: string) {
   await requireAuth();
@@ -48,7 +31,7 @@ export async function syncChapter(novelId: string, chapterSlug: string, content:
   await putFile(path, content, sha, `draft: update ${chapterSlug}`);
 
   const wordCount = countWords(content);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
 
   try {
     let analyticsContent = "[]";
@@ -97,7 +80,7 @@ export async function reorderChapters(novelId: string, chapterOrder: string[]) {
 
   const metaPath = `content/${novelId}/meta.json`;
   const { content, sha } = await getFile(metaPath);
-  const meta = parseMeta(content);
+  const meta = parseNovelMeta(content);
   meta.chapterOrder = chapterOrder;
   await putFile(metaPath, JSON.stringify(meta, null, 2), sha, `chore: reorder chapters for ${novelId}`);
   revalidatePath(`/edit/${novelId}`);
@@ -109,7 +92,7 @@ export async function createChapter(novelId: string, title: string) {
 
   const metaPath = `content/${novelId}/meta.json`;
   const { content, sha } = await getFile(metaPath);
-  const meta = parseMeta(content);
+  const meta = parseNovelMeta(content);
 
   const idx = (meta.chapterOrder?.length ?? 0) + 1;
   const slugBase =
@@ -148,62 +131,24 @@ export async function reindexChapter(
   assertSafeNovelId(novelId);
   assertSafeChapterSlug(chapterSlug);
 
-  // Load chapter title from meta
+  // Load chapter title from meta (best-effort)
   let title = chapterSlug;
   try {
     const { content } = await getFile(`content/${novelId}/meta.json`);
-    const meta = JSON.parse(content) as { chapterTitles?: Record<string, string> };
+    const meta = parseNovelMeta(content);
     title = meta.chapterTitles?.[chapterSlug] ?? chapterSlug;
   } catch {}
 
-  // Load and chunk the chapter
-  let chapterContent: string;
-  try {
-    const { content } = await getFile(`content/${novelId}/manuscript/${chapterSlug}.md`);
-    chapterContent = content;
-  } catch {
-    return { ok: false, chunks: 0, error: "Chapter not found" };
-  }
+  const result = await reindexSingleChapter(novelId, chapterSlug, title);
+  if (!result.ok) return { ok: false, chunks: 0, error: result.error };
+  if (result.chunks === 0) return { ok: true, chunks: 0 };
 
-  const chunks = chunkManuscriptMarkdown(chapterContent);
-  if (chunks.length === 0) return { ok: true, chunks: 0 };
-
-  const embedTexts = chunks.map((chunk, idx) =>
-    manuscriptChunkEmbedText(title, chapterSlug, chunk, `part ${idx + 1} of ${chunks.length}`),
-  );
-
-  // Embed all chunks in one batch call
-  let embeddings: number[][];
-  try {
-    embeddings = await embedBatchMs(embedTexts, "search_document");
-  } catch (e) {
-    return { ok: false, chunks: 0, error: String(e) };
-  }
-
-  // Save embedding shard for this chapter
-  await saveManuscriptEmbShard(
-    novelId,
-    chapterSlug,
-    chunks.map((_, idx) => ({ chunkIndex: idx, embedding: embeddings[idx] ?? [] })),
-  );
-
-  // Update metadata entries for this chapter in the main index
-  const today = new Date().toISOString().slice(0, 10);
+  // Merge new entries into the index, replacing only this chapter's old entries
   const index = await getManuscriptRagIndex(novelId);
-
   const otherEntries = index.entries.filter((e) => e.chapterSlug !== chapterSlug);
-  const newEntries = chunks.map((text, idx) => ({
-    chapterSlug,
-    chunkIndex: idx,
-    chapterTitle: title,
-    embedding: [],
-    text,
-    updatedAt: today,
-  }));
+  await updateManuscriptRagIndex(novelId, { entries: [...otherEntries, ...result.entries] });
 
-  await updateManuscriptRagIndex(novelId, { entries: [...otherEntries, ...newEntries] });
-
-  return { ok: true, chunks: chunks.length };
+  return { ok: true, chunks: result.chunks };
 }
 
 export async function renameChapterTitle(novelId: string, slug: string, title: string) {
@@ -213,7 +158,7 @@ export async function renameChapterTitle(novelId: string, slug: string, title: s
 
   const metaPath = `content/${novelId}/meta.json`;
   const { content, sha } = await getFile(metaPath);
-  const meta = parseMeta(content);
+  const meta = parseNovelMeta(content);
   meta.chapterTitles = { ...(meta.chapterTitles ?? {}), [slug]: title };
   await putFile(metaPath, JSON.stringify(meta, null, 2), sha, `chore: rename chapter ${slug}`);
   revalidatePath(`/edit/${novelId}/${slug}`);

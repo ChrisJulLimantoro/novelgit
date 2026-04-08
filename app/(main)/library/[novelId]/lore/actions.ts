@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth";
+import { todayISO } from "@/lib/utils";
 import { assertSafeNovelId } from "@/lib/ids";
 import {
   getLoreEntry,
@@ -36,7 +37,7 @@ export async function createLoreEntry(input: {
   assertSafeNovelId(input.novelId);
 
   const slug  = slugifyLoreName(input.name);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
   const meta  = { id: slug, type: input.type, name: input.name, tags: input.tags, created: today };
 
   await putLoreEntry(input.novelId, meta, input.body, "", `feat: add lore ${slug}`);
@@ -67,7 +68,7 @@ export async function updateLoreEntry(input: {
   assertSafeNovelId(input.novelId);
 
   const existing = await getLoreEntry(input.novelId, input.slug);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
   const meta  = {
     id:      input.slug,
     type:    input.type,

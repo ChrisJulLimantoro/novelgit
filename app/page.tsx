@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { isValidAuthCookie } from "@/lib/auth";
 import { HeroSection } from "@/components/home/hero-section";
 import { HomeFooter } from "@/components/home/home-footer";
 import { PrivateLibrarySignIn } from "@/components/home/private-library-sign-in";
@@ -17,7 +18,7 @@ export default async function Home({
 }) {
   const sp = await searchParams;
   const jar = await cookies();
-  const authed = jar.get("auth_token")?.value === process.env.AUTH_SECRET;
+  const authed = isValidAuthCookie(jar.get("auth_token")?.value);
 
   const defaultFrom = safeFromParam(sp.from);
   const showError = sp.error === "1" || sp.error === "true";

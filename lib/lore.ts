@@ -1,5 +1,5 @@
 import matter from "gray-matter";
-import { getFile, putFile, deleteFile } from "./github-content";
+import { getFile, getFileSha, putFile, deleteFile } from "./github-content";
 import { assertSafeNovelId, assertSafeLoreSlug } from "./ids";
 import { LoreEntryMetaSchema, LoreIndexSchema } from "@/types/lore";
 import type { LoreEntry, LoreEntryMeta, LoreIndex } from "@/types/lore";
@@ -75,11 +75,7 @@ export async function putLoreEntry(
 
 export async function updateLoreIndex(novelId: string, index: LoreIndex): Promise<void> {
   assertSafeNovelId(novelId);
-  let sha = "";
-  try {
-    const existing = await getFile(loreIndexPath(novelId));
-    sha = existing.sha;
-  } catch { /* first write — sha stays "" */ }
+  const sha = await getFileSha(loreIndexPath(novelId));
   await putFile(
     loreIndexPath(novelId),
     JSON.stringify(index, null, 2),

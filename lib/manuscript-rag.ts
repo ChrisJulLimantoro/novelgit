@@ -1,4 +1,4 @@
-import { getFile, putFile } from "./github-content";
+import { getFile, getFileSha, putFile } from "./github-content";
 import { assertSafeChapterSlug, assertSafeNovelId } from "./ids";
 import {
   ManuscriptRagIndexSchema,
@@ -86,12 +86,7 @@ export async function getManuscriptRagIndex(novelId: string): Promise<Manuscript
 
 export async function updateManuscriptRagIndex(novelId: string, index: ManuscriptRagIndex) {
   assertSafeNovelId(novelId);
-  let sha = "";
-  try {
-    const existing = await getFile(manuscriptRagIndexPath(novelId));
-    sha = existing.sha;
-  } catch {}
-
+  const sha = await getFileSha(manuscriptRagIndexPath(novelId));
   await putFile(
     manuscriptRagIndexPath(novelId),
     JSON.stringify(index, null, 2),
@@ -122,12 +117,7 @@ export async function saveManuscriptEmbShard(
   assertSafeNovelId(novelId);
   assertSafeChapterSlug(chapterSlug);
   const path = manuscriptEmbShardPath(novelId, chapterSlug);
-  let sha = "";
-  try {
-    const existing = await getFile(path);
-    sha = existing.sha;
-  } catch {}
-
+  const sha  = await getFileSha(path);
   await putFile(
     path,
     JSON.stringify({ entries: shards }, null, 2),

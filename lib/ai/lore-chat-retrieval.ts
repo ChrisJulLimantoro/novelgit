@@ -4,7 +4,7 @@
  */
 import { cosineSimilarity } from "@/lib/ai/rag";
 import { getLoreEntry } from "@/lib/lore";
-import { extractQueryKeywords } from "@/lib/ai/manuscript-chat-retrieval";
+import { extractQueryKeywords } from "@/lib/ai/rag-utils";
 import type { LoreEntry, LoreIndex, LoreIndexRecord } from "@/types/lore";
 
 export const LORE_CHAT_K = 10;

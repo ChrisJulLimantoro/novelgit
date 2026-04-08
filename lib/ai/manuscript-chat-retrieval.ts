@@ -3,17 +3,9 @@ import type { ManuscriptRagRecord } from "@/types/manuscript-rag";
 import { getManuscriptEmbShard } from "../manuscript-rag";
 import { getGroq, GROQ_MODEL } from "./client";
 import { embedTextMs } from "./embeddings-openrouter";
+import { extractQueryKeywords } from "./rag-utils";
 
 export const MANUSCRIPT_CHAT_K = 6;
-
-const STOPWORDS = new Set([
-  "the", "and", "for", "are", "but", "not", "you", "all", "can", "her", "was", "one", "our", "out", "day", "get", "has", "him", "his", "how", "its", "may", "new", "now", "old", "see", "two", "way", "she", "use", "man", "any", "did", "what", "when", "where", "which", "with", "have", "from", "that", "this", "they", "them", "than", "then", "here", "just", "into", "your", "about", "after", "before", "could", "would", "should", "there", "these", "those", "some", "very", "much", "more", "most", "only", "such", "same", "both", "each", "few", "being", "over", "again", "think", "know", "need", "want", "make", "like", "well", "back", "even", "still", "been", "chapter", "scene", "tell", "tells", "told", "ask", "asks", "mentioned", "find", "look", "looking", "specific", "information", "novel", "story", "please", "help", "directly", "provided", "excerpts", "notes", "who", "whom", "whose",
-]);
-
-export function extractQueryKeywords(message: string): string[] {
-  const raw = message.toLowerCase().match(/[a-z0-9']+/g) ?? [];
-  return [...new Set(raw.filter((w) => w.length >= 3 && !STOPWORDS.has(w)))];
-}
 
 /**
  * HyDE: generate a short hypothetical prose passage that would answer the
@@ -89,7 +81,7 @@ export async function buildManuscriptContextForChat(
   if (hasEmbeddings) {
     try {
       const hypothesis = await hydeExpand(userMessage);
-      queryEmbedding = await embedTextMs(hypothesis, "search_query");
+      queryEmbedding = await embedTextMs(hypothesis);
     } catch {
       // HyDE/embedding unavailable — keyword scoring will still work
     }

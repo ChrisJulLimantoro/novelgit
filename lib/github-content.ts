@@ -26,6 +26,15 @@ export async function getFile(path: string): Promise<{ content: string; sha: str
   };
 }
 
+/** Returns the current SHA for a file, or `""` if the file does not exist yet. */
+export async function getFileSha(path: string): Promise<string> {
+  try {
+    return (await getFile(path)).sha;
+  } catch {
+    return "";
+  }
+}
+
 export async function putFile(
   path:    string,
   content: string,

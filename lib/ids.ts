@@ -1,7 +1,9 @@
 /** GitHub path segments: lowercase slug, no slashes or traversal. */
 const NOVEL_ID_RE    = /^[a-z0-9][a-z0-9-]{0,63}$/;
+// Chapter and lore slugs share the same shape today. They are kept as separate
+// constants so each can be tightened independently without touching the other.
 const CHAPTER_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,127}$/;
-const LORE_SLUG_RE   = /^[a-z0-9][a-z0-9-]{0,127}$/;
+const LORE_SLUG_RE    = /^[a-z0-9][a-z0-9-]{0,127}$/;
 
 export function assertSafeNovelId(id: string): void {
   if (!NOVEL_ID_RE.test(id)) {

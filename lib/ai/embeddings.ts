@@ -25,20 +25,39 @@ function assertKey(): void {
 
 async function postEmbeddings(input: string[]): Promise<number[][]> {
   assertKey();
-  const res = await fetch(VOYAGE_EMBEDDINGS_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type":  "application/json",
-      Authorization:   `Bearer ${process.env.VOYAGE_API_KEY}`,
-    },
-    body: JSON.stringify({
-      input,
-      model: MODEL,
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(VOYAGE_EMBEDDINGS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type":  "application/json",
+        Authorization:   `Bearer ${process.env.VOYAGE_API_KEY}`,
+      },
+      body: JSON.stringify({
+        input,
+        model: MODEL,
+      }),
+    });
+  } catch (e) {
+    console.error(
+      "[voyage:embeddings] fetch threw (network / TLS / DNS?)",
+      e instanceof Error ? { message: e.message, stack: e.stack } : String(e),
+    );
+    throw e;
+  }
 
   const raw = await res.text();
   if (!res.ok) {
+    console.error(
+      "[voyage:embeddings] request failed",
+      JSON.stringify({
+        status:      res.status,
+        statusText:  res.statusText,
+        model:       MODEL,
+        inputCount:  input.length,
+        bodyPreview: raw.slice(0, 800),
+      }),
+    );
     throw new Error(`Voyage embeddings failed (${res.status}): ${raw.slice(0, 500)}`);
   }
 
@@ -46,6 +65,7 @@ async function postEmbeddings(input: string[]): Promise<number[][]> {
   try {
     parsed = JSON.parse(raw) as VoyageEmbeddingsResponse;
   } catch {
+    console.error("[voyage:embeddings] invalid JSON", { preview: raw.slice(0, 600) });
     throw new Error("Voyage embeddings: invalid JSON response");
   }
 
@@ -53,6 +73,16 @@ async function postEmbeddings(input: string[]): Promise<number[][]> {
     (a, b) => (a.index ?? 0) - (b.index ?? 0),
   );
   if (rows.length !== input.length) {
+    console.error(
+      "[voyage:embeddings] row count mismatch",
+      JSON.stringify({
+        expected:     input.length,
+        got:          rows.length,
+        model:        MODEL,
+        rawPreview:   raw.slice(0, 800),
+        topLevelKeys: Object.keys(parsed),
+      }),
+    );
     throw new Error(
       `Voyage embeddings: expected ${input.length} rows, got ${rows.length}`,
     );
