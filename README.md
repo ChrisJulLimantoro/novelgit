@@ -1,84 +1,188 @@
-# NovelGit
+# NovelGit — AI-powered Novel Management
 
-NovelGit is a web app for managing long-form fiction in a **private GitHub repository**. The UI includes a library, a **TipTap**-based editor with local drafts and GitHub sync, per-novel analytics, PDF/DOCX export, optional **lore / world-bible** files in the repo, and optional **AI** (Groq LLM + **Voyage embeddings for lore RAG** in chat)—while your manuscripts stay versioned as plain files you can also open locally (for example in Obsidian).
+> Write freely. Your manuscripts live as plain Markdown in your own GitHub repository, version-controlled and readable in any editor. AI is layered on top — free to use, optional, and easy to turn off.
+
+## What it is
+
+NovelGit is a self-hosted web app for managing long-form fiction. It gives you a library, a rich editor (TipTap + GitHub sync), analytics, PDF/DOCX export, a structured world-bible (lore), and an AI chat assistant that knows both your lore notes **and** the actual text of your manuscript.
+
+Everything is free to run:
+- **GitHub** (free tier) stores all your content as plain `.md` files
+- **Groq** (free tier) powers the LLM — scaffold lore entries and chat
+- **OpenRouter** (free model) embeds manuscript chunks for semantic search
+- **Voyage** (optional, paid) embeds lore entries for richer semantic search — degrades gracefully to keyword matching without it
+
+---
 
 ## Features
 
-- **Landing page** (`/`) — marketing hero, then a **private library** gate: users enter the deployment passphrase (must match `AUTH_SECRET`) to unlock the app. Signed-in users see a short “Go to library” strip after the hero.
-- **Library** (`/library`) — reads `config/novels.json` from the content repo and lists novels; create new novels and scaffold `content/<id>/…` via server actions. **Requires authentication** (same session as the editor).
-- **Editor** (`/edit/[novelId]/[chapterSlug]`) — TipTap (Markdown) editor, debounced local drafts, sync to GitHub, chapter sidebar with drag-and-drop order stored in `meta.json`, read/edit modes, and a **floating prev/next chapter bar** in read mode.
-- **Lore** (`/library/[novelId]/lore`) — manage per-novel lore entries stored as Markdown under `content/<novelId>/lore/` with `lore-index.json` for metadata and embeddings (when AI is configured).
-- **AI (optional)** — `GROQ_API_KEY` for LLM (scaffold + chat). **`VOYAGE_API_KEY`** for **lore** embeddings (Voyage REST in [`lib/ai/embeddings.ts`](lib/ai/embeddings.ts)). Chat retrieval uses **lore only**; run **Reindex RAG** in the editor after changing lore so `lore-index.json` stays embedded. Manuscript RAG / local embedding code paths are **disabled at runtime** ([`lib/ai/embeddings-local.ts`](lib/ai/embeddings-local.ts) is a stub; `@xenova/transformers` is not a dependency).
-- **Analytics** (`/library/[novelId]/analytics`) — calendar heatmap from `content/<novelId>/analytics.json` (best-effort update on sync; failures do not block chapter saves).
-- **Export** — `GET /api/export/[novelId]?format=pdf|docx` builds a combined manuscript in chapter order (also requires auth).
-- **Auth** — Single-user passphrase. **`proxy.ts`** (Next.js route protection) gates **`/library`**, **`/edit`**, **`/admin`**, and **`/api/export/*`**. **`/api/ai/*`** routes validate the session cookie inside each handler. Server actions call **`requireAuth()`**. Successful login sets an **opaque httpOnly session cookie** (HMAC-derived from `AUTH_SECRET`); legacy cookies that stored the raw secret are still accepted until users sign in again. Unauthenticated visitors only see the public hero; `/login` redirects to the home page sign-in section (`#private-library`).
+- **Library** — list and manage novels; scaffold `content/<id>/…` in the content repo
+- **Editor** — TipTap (Markdown), debounced local drafts, GitHub sync, drag-and-drop chapter order, read/edit modes, floating prev/next chapter bar
+- **Lore / world-bible** — per-novel entries stored as `content/<novelId>/lore/*.md` with AI scaffold (generate a template from a name + type) and semantic search
+- **AI Chat** — ask anything about your novel; retrieves relevant lore entries and manuscript excerpts simultaneously, combines both to answer
+- **Analytics** — calendar heatmap of daily word counts
+- **Export** — combined manuscript as PDF or DOCX, in chapter order
+- **Auth** — single-user passphrase; session cookie; all writing routes protected
+
+---
+
+## AI & RAG
+
+The AI assistant uses **Retrieval-Augmented Generation**: before calling the LLM it fetches the most relevant lore entries and manuscript excerpts and injects them into the system prompt.
+
+### Lore RAG
+
+Lore entries are short structured files (character, location, faction, event, item). Each entry is embedded via **Voyage AI** (`voyage-3`, 1024 dimensions) and stored in `content/{novelId}/lore-index.json`. At chat time the query is embedded and scored against all entries using cosine similarity + keyword + entity-hint bonuses ("who is X" patterns).
+
+Requires `VOYAGE_API_KEY`. Without it, lore retrieval falls back to name/tag keyword matching.
+
+### Manuscript RAG
+
+Chapters are split into overlapping 400-character chunks (1-paragraph overlap so adjacent-paragraph attribution is preserved). Each chunk is embedded via **OpenRouter** (`nvidia/llama-nemotron-embed-vl-1b-v2:free`, 2048 dimensions) and stored in per-chapter shard files at `content/{novelId}/manuscript-rag-emb/{chapterSlug}.json`. Metadata (text, chapter title, chunk index) is stored separately in `manuscript-rag-index.json`.
+
+At chat time:
+1. **HyDE** — Groq generates a short hypothetical prose passage that would answer the query (bridges plot-summary language like "when kiyotaka confess" to first-person prose like "I love you")
+2. The hypothesis is embedded and used for cosine similarity search
+3. Hybrid scoring: embedding similarity + keyword hits + proper-noun VIP lane
+4. Top 6 chunks returned
+
+Requires `OPENROUTER_API_KEY`. Free — no credit card needed.
+
+### How retrieval works
+
+Both lore and manuscript context are **always retrieved simultaneously** and passed to the LLM together. The LLM combines both sources to answer. Neither source "wins" — the model decides how to weight them.
+
+### Citation behaviour
+
+- **Character / world-building questions** ("who is arisu", "what is class A's goal") — the LLM answers from both lore and manuscript context but does not surface chapter names or locations.
+- **Scene / location questions** ("when does arisu confess", "which chapter does the swimming competition happen") — the LLM cites the chapter title.
+
+### Reindex RAG
+
+After writing or editing content, hit **Reindex RAG** in the editor AI sidebar to rebuild embeddings. You can also call `reindexChapter(novelId, slug)` from the editor to reindex a single chapter cheaply (1 API call to OpenRouter) without rebuilding everything.
+
+---
 
 ## Stack
 
-- [Next.js](https://nextjs.org/) 16 (App Router), React 19, TypeScript
-- [Tailwind CSS](https://tailwindcss.com/) v4, [shadcn/ui](https://ui.shadcn.com/)-style components
-- [Octokit](https://github.com/octokit/octokit.js) for GitHub Contents API
-- [TipTap](https://tiptap.dev/) + `tiptap-markdown`, `@dnd-kit`, `@nivo/calendar`, `@react-pdf/renderer`, `docx`
-- [Groq SDK](https://github.com/groq/groq-typescript) (`groq-sdk`) for LLM calls; **gray-matter** for lore front matter; Voyage HTTP API for lore embeddings (no `voyageai` npm SDK)
+- **Next.js 16** (App Router), React 19, TypeScript
+- **Tailwind CSS v4**, shadcn/ui-style components
+- **Octokit** — GitHub Contents API for all content reads/writes
+- **TipTap** + `tiptap-markdown`, `@dnd-kit`, `@nivo/calendar`, `@react-pdf/renderer`, `docx`
+- **Groq SDK** (`llama-3.3-70b-versatile`) — LLM for scaffold + chat + HyDE query expansion
+- **Voyage HTTP API** — lore embeddings (no `voyageai` npm SDK)
+- **OpenRouter HTTP API** — manuscript embeddings (no SDK)
+- **gray-matter** — lore frontmatter parsing
 
-## Prerequisites
+---
 
-1. A **GitHub repository** that will hold all content (manuscripts, config). Note `owner/repo`.
-2. A **Personal Access Token** with `contents: read/write` and `metadata: read` (classic or fine-grained).
-3. **Seed** the repo before first run (paths are relative to the repo root):
+## Installation
 
-   ```text
-   config/novels.json   → { "novels": [] }
-   content/.gitkeep       → empty placeholder (or any file so `content/` exists)
-   ```
+### Step 1: Prerequisites
 
-## Environment variables
+- Node.js 20+
+- A **GitHub account** (free)
+- A **Groq account** for a free API key — [console.groq.com](https://console.groq.com)
+- An **OpenRouter account** for a free API key — [openrouter.ai/keys](https://openrouter.ai/keys)
+- *(Optional)* A **Voyage AI account** for lore embeddings — [voyageai.com](https://www.voyageai.com)
 
-Create `.env.local` in the project root (see `.env.example`). Vercel (or your host) should define the same variables.
+### Step 2: Create the content repository
 
-| Variable | Purpose |
-|----------|---------|
-| `GITHUB_TOKEN` | PAT for the content repository |
-| `GITHUB_REPO` | `owner/repo` of the content store (validated at startup; must be exactly two path segments) |
-| `AUTH_SECRET` | Passphrase users type on the home page (after the hero); used to verify login and mint session tokens |
-| `GROQ_API_KEY` | Optional — AI lore scaffold and chat (`llama-3.3-70b-versatile` via Groq) |
-| `VOYAGE_API_KEY` | Optional — **lore** embeddings for semantic search and chat RAG (`voyage-3` via `https://api.voyageai.com/v1/embeddings`) |
+Create a **new private GitHub repository** (e.g. `my-novels-content`). This repo stores all your manuscripts and config — not the app code.
 
-Without `GROQ_API_KEY`, scaffold/chat LLM calls fail. Without `VOYAGE_API_KEY`, editor **searchLore** falls back to name/tag matching, and **Reindex RAG** cannot embed lore entries (Voyage is required for lore vectors). Chat uses retrieved lore only when embeddings exist. Core writing and library features work without AI keys.
+Seed it with two files:
 
-Optional: `GET /api/health` calls `octokit.rest.repos.get`—use it to verify token and repo name in deployment.
+**`config/novels.json`**
+```json
+{ "novels": [] }
+```
 
-## Getting started
+**`content/.gitkeep`**
+```
+(empty file)
+```
+
+Then create a **Personal Access Token** with `Contents: Read and Write` + `Metadata: Read` permission scoped to this repository. Save the token — you'll need it in Step 4.
+
+### Step 3: Clone and install
 
 ```bash
+git clone https://github.com/your-username/novelgit.git
+cd novelgit
 npm install
+```
+
+### Step 4: Configure environment
+
+Copy `.env.example` to `.env.local` and fill in your values:
+
+```bash
+cp .env.example .env.local
+```
+
+```env
+# Required
+GITHUB_TOKEN=ghp_...          # PAT from Step 2
+GITHUB_REPO=owner/repo        # e.g. myuser/my-novels-content
+AUTH_SECRET=your-passphrase   # anything you'll remember; used to log in
+
+# AI — all optional but recommended
+GROQ_API_KEY=gsk_...          # Groq free tier (LLM + HyDE)
+OPENROUTER_API_KEY=sk-or-...  # OpenRouter free tier (manuscript embeddings)
+VOYAGE_API_KEY=pa-...         # Voyage (lore embeddings — paid, optional)
+```
+
+### Step 5: Run
+
+```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Scroll past the hero and enter your passphrase to unlock **Library** and **Editor**. Visiting `/library` without a session redirects to `/?from=…` on the home page (scrolls to the sign-in block when `from` is set).
+Open [http://localhost:3000](http://localhost:3000). Scroll past the hero and enter your passphrase to unlock the library and editor.
 
-### Scripts
+---
+
+## Environment variables
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `GITHUB_TOKEN` | Yes | PAT for the content repository (`contents: read/write`, `metadata: read`) |
+| `GITHUB_REPO` | Yes | `owner/repo` of the content store |
+| `AUTH_SECRET` | Yes | Passphrase used to mint session cookies |
+| `GROQ_API_KEY` | Recommended | LLM for scaffold, chat, and HyDE query expansion (free tier) |
+| `OPENROUTER_API_KEY` | Recommended | Manuscript chunk embeddings — `nvidia/llama-nemotron-embed-vl-1b-v2:free` (free, no credit card) |
+| `VOYAGE_API_KEY` | Optional | Lore entry embeddings — `voyage-3` via REST (paid, degrades to keyword search without it) |
+
+Core writing and library features work with only the three required variables. AI features degrade gracefully when optional keys are absent.
+
+---
+
+## Scripts
 
 | Command | Description |
-|---------|-------------|
-| `npm run dev` | Next.js dev server (see `package.json` for flags) |
+|---|---|
+| `npm run dev` | Next.js dev server |
 | `npm run build` | Production build |
 | `npm run start` | Run production server |
 | `npm run lint` | ESLint |
 
-## Documentation
-
-| Doc | Contents |
-|-----|----------|
-| [docs/design-docs.md](docs/design-docs.md) | Architecture, content schema, roadmap |
-| [docs/spec/implementation-plan.md](docs/spec/implementation-plan.md) | Phased plan and file layout (historical + status) |
-| [docs/spec/ai-rag-plan.md](docs/spec/ai-rag-plan.md) | Lore + RAG + AI routes |
-| [docs/nextjs-coding-guide.md](docs/nextjs-coding-guide.md) | Next.js 16 / React 19 conventions for this repo |
-| [docs/ui-ux.md](docs/ui-ux.md) | UI stack and patterns (some long sections describe earlier plans) |
-| [docs/creative-ui-guide.md](docs/creative-ui-guide.md) | Creative UI notes |
-
-This project targets **Next.js 16** APIs—see `node_modules/next/dist/docs/` for framework details that may differ from older Next.js versions.
+---
 
 ## Deploying
 
-Deploy on [Vercel](https://vercel.com/) or any Node host that supports Next.js. Set `GITHUB_TOKEN`, `GITHUB_REPO`, and `AUTH_SECRET` in the project environment. Add `GROQ_API_KEY` / `VOYAGE_API_KEY` as needed for LLM and lore semantics. **Reindex RAG** only calls Voyage for lore; typical runs are short. Pushing commits to the **content** repo may trigger your own workflows; the app itself commits via the API, so allow for GitHub rate limits and propagation when syncing.
+Deploy on [Vercel](https://vercel.com/) or any Node host that supports Next.js. Set all environment variables in the project settings. The app commits content via the GitHub API — allow for rate limits when syncing many chapters.
+
+`GET /api/health` calls `octokit.rest.repos.get` — use it to verify token and repo name after deployment.
+
+---
+
+## Documentation
+
+| Doc | Contents |
+|---|---|
+| [docs/design-docs.md](docs/design-docs.md) | Architecture, content schema, data flow |
+| [docs/spec/ai-rag-plan.md](docs/spec/ai-rag-plan.md) | Lore + RAG + AI routes (original spec) |
+| [docs/nextjs-coding-guide.md](docs/nextjs-coding-guide.md) | Next.js 16 / React 19 conventions |
+| [docs/ui-ux.md](docs/ui-ux.md) | UI stack and component patterns |
+
+This project targets **Next.js 16** — see `node_modules/next/dist/docs/` for APIs that may differ from older versions.

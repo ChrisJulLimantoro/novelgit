@@ -1,43 +1,76 @@
 import { getFile, putFile } from "./github-content";
 import { assertSafeChapterSlug, assertSafeNovelId } from "./ids";
-import { ManuscriptRagIndexSchema } from "@/types/manuscript-rag";
-import type { ManuscriptRagIndex } from "@/types/manuscript-rag";
+import {
+  ManuscriptRagIndexSchema,
+  ManuscriptEmbShardSchema,
+} from "@/types/manuscript-rag";
+import type {
+  ManuscriptRagIndex,
+  ManuscriptEmbShardEntry,
+} from "@/types/manuscript-rag";
 
-/** * Smaller chunks (1000 chars) help MiniLM keep specific names 
- * from being "drowned out" by surrounding prose.
+/**
+ * Smaller chunks (400 chars) with 1-paragraph overlap so adjacent-paragraph
+ * attribution is always captured. Example: Kiyotaka named in P1, says "I love
+ * you" in P2 — both paragraphs appear together in the same chunk.
  */
-const MANUSCRIPT_CHUNK_CHARS = 1000;
+const MANUSCRIPT_CHUNK_CHARS = 400;
 
 function manuscriptRagIndexPath(novelId: string) {
   return `content/${novelId}/manuscript-rag-index.json`;
 }
 
+export function manuscriptEmbShardPath(novelId: string, chapterSlug: string) {
+  return `content/${novelId}/manuscript-rag-emb/${chapterSlug}.json`;
+}
+
+/**
+ * Sliding-window paragraph chunker.
+ * - Groups paragraphs into chunks ≤ MANUSCRIPT_CHUNK_CHARS.
+ * - The last paragraph of each chunk becomes the first of the next (1-para overlap).
+ * - Oversized single paragraphs are hard-split at the char limit.
+ */
 export function chunkManuscriptMarkdown(markdown: string): string[] {
   const text = markdown.trim();
   if (!text) return [];
 
   const paras = text.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
   const chunks: string[] = [];
-  let buf = "";
+  let i = 0;
 
-  const flush = () => {
-    const t = buf.trim();
-    if (t) chunks.push(t);
-    buf = "";
-  };
+  while (i < paras.length) {
+    const p = paras[i];
 
-  for (const p of paras) {
-    if (buf.length + p.length + 2 > MANUSCRIPT_CHUNK_CHARS && buf) flush();
+    // Hard-split oversized single paragraphs
     if (p.length > MANUSCRIPT_CHUNK_CHARS) {
-      flush();
-      for (let i = 0; i < p.length; i += MANUSCRIPT_CHUNK_CHARS) {
-        chunks.push(p.slice(i, i + MANUSCRIPT_CHUNK_CHARS));
+      for (let j = 0; j < p.length; j += MANUSCRIPT_CHUNK_CHARS) {
+        chunks.push(p.slice(j, j + MANUSCRIPT_CHUNK_CHARS));
       }
+      i++;
       continue;
     }
-    buf = buf ? `${buf}\n\n${p}` : p;
+
+    // Accumulate paragraphs until the chunk is full
+    const buf: string[] = [p];
+    let len = p.length;
+    i++;
+
+    while (i < paras.length) {
+      const next = paras[i];
+      if (next.length > MANUSCRIPT_CHUNK_CHARS) break; // let oversized handler take it
+      if (len + 2 + next.length > MANUSCRIPT_CHUNK_CHARS) break;
+      buf.push(next);
+      len += 2 + next.length;
+      i++;
+    }
+
+    chunks.push(buf.join("\n\n"));
+
+    // 1-paragraph overlap: repeat last paragraph as first of next chunk,
+    // but only when there's still content to process (prevents trailing dup).
+    if (buf.length >= 2 && i < paras.length) i -= 1;
   }
-  flush();
+
   return chunks;
 }
 
@@ -58,17 +91,52 @@ export async function updateManuscriptRagIndex(novelId: string, index: Manuscrip
     const existing = await getFile(manuscriptRagIndexPath(novelId));
     sha = existing.sha;
   } catch {}
-  
+
   await putFile(
     manuscriptRagIndexPath(novelId),
     JSON.stringify(index, null, 2),
     sha,
-    `chore: update manuscript-rag-index ${novelId}`
+    `chore: update manuscript-rag-index ${novelId}`,
   );
 }
 
-/** Load live chapter text for a stored chunk index (skips stale rows). */
+export async function getManuscriptEmbShard(
+  novelId: string,
+  chapterSlug: string,
+): Promise<ManuscriptEmbShardEntry[]> {
+  assertSafeNovelId(novelId);
+  assertSafeChapterSlug(chapterSlug);
+  try {
+    const { content } = await getFile(manuscriptEmbShardPath(novelId, chapterSlug));
+    return ManuscriptEmbShardSchema.parse(JSON.parse(content)).entries;
+  } catch {
+    return [];
+  }
+}
 
+export async function saveManuscriptEmbShard(
+  novelId: string,
+  chapterSlug: string,
+  shards: ManuscriptEmbShardEntry[],
+): Promise<void> {
+  assertSafeNovelId(novelId);
+  assertSafeChapterSlug(chapterSlug);
+  const path = manuscriptEmbShardPath(novelId, chapterSlug);
+  let sha = "";
+  try {
+    const existing = await getFile(path);
+    sha = existing.sha;
+  } catch {}
+
+  await putFile(
+    path,
+    JSON.stringify({ entries: shards }, null, 2),
+    sha,
+    `chore: update manuscript-rag-emb ${chapterSlug} for ${novelId}`,
+  );
+}
+
+/** Load live chapter text for a stored chunk (skips stale rows). */
 export async function getManuscriptChunkText(
   novelId: string,
   chapterSlug: string,
@@ -79,8 +147,7 @@ export async function getManuscriptChunkText(
   try {
     const { content } = await getFile(`content/${novelId}/manuscript/${chapterSlug}.md`);
     const chunks = chunkManuscriptMarkdown(content);
-    const t = chunks[chunkIndex];
-    return t ?? null;
+    return chunks[chunkIndex] ?? null;
   } catch {
     return null;
   }

@@ -5,6 +5,14 @@ import { getFile, putFile } from "@/lib/github-content";
 import { countWords } from "@/lib/word-count";
 import { requireAuth } from "@/lib/auth";
 import { assertSafeChapterSlug, assertSafeNovelId } from "@/lib/ids";
+import {
+  chunkManuscriptMarkdown,
+  manuscriptChunkEmbedText,
+  getManuscriptRagIndex,
+  updateManuscriptRagIndex,
+  saveManuscriptEmbShard,
+} from "@/lib/manuscript-rag";
+import { embedBatchMs } from "@/lib/ai/embeddings-openrouter";
 
 function parseMeta(content: string): {
   chapterOrder?:  string[];
@@ -125,6 +133,77 @@ export async function createChapter(novelId: string, title: string) {
   revalidatePath(`/edit/${novelId}`);
   revalidatePath(`/library/${novelId}`);
   return slug;
+}
+
+/**
+ * Reindex a single chapter's RAG embeddings.
+ * Cheaper than full reindex: 1 OpenRouter batch call per chapter instead of N.
+ * Call this from the editor after finishing a writing session, not on every save.
+ */
+export async function reindexChapter(
+  novelId: string,
+  chapterSlug: string,
+): Promise<{ ok: boolean; chunks: number; error?: string }> {
+  await requireAuth();
+  assertSafeNovelId(novelId);
+  assertSafeChapterSlug(chapterSlug);
+
+  // Load chapter title from meta
+  let title = chapterSlug;
+  try {
+    const { content } = await getFile(`content/${novelId}/meta.json`);
+    const meta = JSON.parse(content) as { chapterTitles?: Record<string, string> };
+    title = meta.chapterTitles?.[chapterSlug] ?? chapterSlug;
+  } catch {}
+
+  // Load and chunk the chapter
+  let chapterContent: string;
+  try {
+    const { content } = await getFile(`content/${novelId}/manuscript/${chapterSlug}.md`);
+    chapterContent = content;
+  } catch {
+    return { ok: false, chunks: 0, error: "Chapter not found" };
+  }
+
+  const chunks = chunkManuscriptMarkdown(chapterContent);
+  if (chunks.length === 0) return { ok: true, chunks: 0 };
+
+  const embedTexts = chunks.map((chunk, idx) =>
+    manuscriptChunkEmbedText(title, chapterSlug, chunk, `part ${idx + 1} of ${chunks.length}`),
+  );
+
+  // Embed all chunks in one batch call
+  let embeddings: number[][];
+  try {
+    embeddings = await embedBatchMs(embedTexts, "search_document");
+  } catch (e) {
+    return { ok: false, chunks: 0, error: String(e) };
+  }
+
+  // Save embedding shard for this chapter
+  await saveManuscriptEmbShard(
+    novelId,
+    chapterSlug,
+    chunks.map((_, idx) => ({ chunkIndex: idx, embedding: embeddings[idx] ?? [] })),
+  );
+
+  // Update metadata entries for this chapter in the main index
+  const today = new Date().toISOString().slice(0, 10);
+  const index = await getManuscriptRagIndex(novelId);
+
+  const otherEntries = index.entries.filter((e) => e.chapterSlug !== chapterSlug);
+  const newEntries = chunks.map((text, idx) => ({
+    chapterSlug,
+    chunkIndex: idx,
+    chapterTitle: title,
+    embedding: [],
+    text,
+    updatedAt: today,
+  }));
+
+  await updateManuscriptRagIndex(novelId, { entries: [...otherEntries, ...newEntries] });
+
+  return { ok: true, chunks: chunks.length };
 }
 
 export async function renameChapterTitle(novelId: string, slug: string, title: string) {

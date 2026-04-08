@@ -3,11 +3,16 @@ import { isValidAuthCookie } from "@/lib/auth";
 import { assertSafeNovelId } from "@/lib/ids";
 import { getGroq, GROQ_MODEL } from "@/lib/ai/client";
 import { getLoreIndex } from "@/lib/lore";
+import { getManuscriptRagIndex } from "@/lib/manuscript-rag";
 import { getFile } from "@/lib/github-content";
 import {
   buildLoreContextForChat,
   LORE_CHAT_K,
 } from "@/lib/ai/lore-chat-retrieval";
+import {
+  buildManuscriptContextForChat,
+  MANUSCRIPT_CHAT_K,
+} from "@/lib/ai/manuscript-chat-retrieval";
 import { ChatMessageSchema } from "@/types/lore";
 import { z } from "zod";
 
@@ -44,11 +49,10 @@ export async function POST(
     novelTitle = meta.title ?? novelId;
   } catch { /* use novelId as fallback */ }
 
+  // — Lore RAG context —
   let loreContext = "";
-
   try {
     const loreIndex = await getLoreIndex(novelId);
-
     const loreHasEmb =
       loreIndex.entries.length > 0 && loreIndex.entries.some((e) => e.embedding.length > 0);
 
@@ -71,11 +75,43 @@ export async function POST(
         LORE_CHAT_K,
       );
     }
-  } catch { /* best-effort — continue without RAG context */ }
+  } catch { /* best-effort */ }
+
+  // — Manuscript RAG context (HyDE + semantic retrieval) —
+  let manuscriptContext = "";
+  try {
+    const msIndex = await getManuscriptRagIndex(novelId);
+    if (msIndex.entries.length > 0) {
+      manuscriptContext = await buildManuscriptContextForChat(
+        novelId,
+        msIndex.entries,
+        lastUserMessage.content,
+        MANUSCRIPT_CHAT_K,
+      );
+    }
+  } catch { /* best-effort */ }
+
+  // Build system prompt
+  const contextSections: string[] = [];
+  if (loreContext) {
+    contextSections.push(`## World-building (lore)\n${loreContext}`);
+  }
+  if (manuscriptContext) {
+    contextSections.push(`## Manuscript excerpts\n${manuscriptContext}`);
+  }
+
+  // Only instruct the LLM to cite chapter locations when the user is explicitly
+  // asking where/when something happens in the manuscript. For character or
+  // world-building questions the chapter citations are noise.
+  const SCENE_QUERY_RE = /\b(when|which chapter|where does|where do|find the scene|what chapter|in which|at what point|in what chapter)\b/i;
+  const isSceneQuery = SCENE_QUERY_RE.test(lastUserMessage.content);
+  const citationInstruction = isSceneQuery
+    ? "When the answer refers to a specific scene or moment in the manuscript, cite the chapter title."
+    : "Draw on the provided lore and manuscript context to inform your answer. Do not mention chapter names or locations unless specifically asked.";
 
   const systemPrompt =
-    loreContext
-      ? `You are a creative writing assistant for the novel "${novelTitle}". You have retrieved context from the author's lore notes below. Use them for world-building and continuity.\n\n## World-building (lore)\n${loreContext}\n\nIf the answer appears in the lore, cite the entry name when helpful. If the notes do not contain enough to answer, say so clearly. Run **Reindex RAG** in the editor (with \`VOYAGE_API_KEY\` set) after updating lore so embeddings stay current. Answer concisely.`
+    contextSections.length > 0
+      ? `You are a creative writing assistant for the novel "${novelTitle}". You have retrieved context from the author's notes below. Use them for continuity and world-building.\n\n${contextSections.join("\n\n")}\n\n${citationInstruction} If the context does not contain enough to answer, say so clearly. Answer concisely.`
       : `You are a creative writing assistant for the novel "${novelTitle}". Help the author with questions, ideas, and writing challenges.`;
 
   const encoder = new TextEncoder();
@@ -104,10 +140,10 @@ export async function POST(
 
   return new Response(stream, {
     headers: {
-      "Content-Type":             "text/plain; charset=utf-8",
-      "X-Content-Type-Options":   "nosniff",
-      "Cache-Control":            "no-cache",
-      "Transfer-Encoding":        "chunked",
+      "Content-Type":           "text/plain; charset=utf-8",
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control":          "no-cache",
+      "Transfer-Encoding":      "chunked",
     },
   });
 }

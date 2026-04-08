@@ -1,143 +1,128 @@
 import { cosineSimilarity } from "@/lib/ai/rag";
 import type { ManuscriptRagRecord } from "@/types/manuscript-rag";
-import { chunkManuscriptMarkdown } from "../manuscript-rag";
-import { getFile } from "@/lib/github-content";
-import { assertSafeChapterSlug, assertSafeNovelId } from "../ids";
+import { getManuscriptEmbShard } from "../manuscript-rag";
+import { getGroq, GROQ_MODEL } from "./client";
+import { embedTextMs } from "./embeddings-openrouter";
 
-/** Wider pool to ensure we catch all mentions across 27+ chapters */
-const SEMANTIC_POOL = 250; 
-export const MANUSCRIPT_CHAT_K = 6; 
+export const MANUSCRIPT_CHAT_K = 6;
 
 const STOPWORDS = new Set([
   "the", "and", "for", "are", "but", "not", "you", "all", "can", "her", "was", "one", "our", "out", "day", "get", "has", "him", "his", "how", "its", "may", "new", "now", "old", "see", "two", "way", "she", "use", "man", "any", "did", "what", "when", "where", "which", "with", "have", "from", "that", "this", "they", "them", "than", "then", "here", "just", "into", "your", "about", "after", "before", "could", "would", "should", "there", "these", "those", "some", "very", "much", "more", "most", "only", "such", "same", "both", "each", "few", "being", "over", "again", "think", "know", "need", "want", "make", "like", "well", "back", "even", "still", "been", "chapter", "scene", "tell", "tells", "told", "ask", "asks", "mentioned", "find", "look", "looking", "specific", "information", "novel", "story", "please", "help", "directly", "provided", "excerpts", "notes", "who", "whom", "whose",
 ]);
 
-async function loadChapter(
-  novelId: string,
-  chapterSlug: string,
-  cache: Map<string, string>,
-): Promise<string | null> {
-  assertSafeNovelId(novelId);
-  try { assertSafeChapterSlug(chapterSlug); }
-  catch { return null; }
-  let full = cache.get(chapterSlug);
-  if (full === undefined) {
-    try {
-      const { content } = await getFile(`content/${novelId}/manuscript/${chapterSlug}.md`);
-      cache.set(chapterSlug, content);
-      full = content;
-    } catch {
-      cache.set(chapterSlug, "");
-      return null;
-    }
-  }
-  if (full === "") return null;
-  return full ?? null;
-}
-
 export function extractQueryKeywords(message: string): string[] {
   const raw = message.toLowerCase().match(/[a-z0-9']+/g) ?? [];
-  return [...new Set(raw.filter(w => w.length >= 3 && !STOPWORDS.has(w)))];
+  return [...new Set(raw.filter((w) => w.length >= 3 && !STOPWORDS.has(w)))];
 }
 
-// export async function buildManuscriptContextForChat(
-//   novelId:      string,
-//   entries:      ManuscriptRagRecord[],
-//   queryMs:      number[],
-//   userMessage:  string,
-//   k:            number
-// ): Promise<string> {
-//   if (entries.length === 0 || queryMs.length === 0) return "";
-
-//   const terms = extractQueryKeywords(userMessage);
-//   const cache = new Map<string, string>();
-
-//   // 1. We have to take a MASSIVE pool because the "Blind" 
-//   // vector search is unreliable for names.
-//   const scored = entries
-//     .map(e => ({ e, score: cosineSimilarity(queryMs, e.embedding) }))
-//     .sort((a, b) => b.score - a.score)
-//     .slice(0, 300); // Net must be wide!
-
-//   const rows: { e: ManuscriptRagRecord, combined: number, body: string }[] = [];
-
-//   // 2. We MUST fetch the text for all 300 candidates to find the name
-//   for (const { e, score } of scored) {
-//     const full = await loadChapter(novelId, e.chapterSlug, cache);
-//     if (!full) continue;
-    
-//     const chunks = chunkManuscriptMarkdown(full);
-//     const body = chunks[e.chunkIndex];
-//     if (!body) continue;
-
-//     const lowBody = body.toLowerCase();
-//     let hasName = false;
-//     for (const t of terms) {
-//       if (lowBody.includes(t)) {
-//         hasName = true;
-//         break;
-//       }
-//     }
-
-//     // Now the rescue actually works because 'body' exists!
-//     const combined = hasName ? 1.0 + score : score;
-//     rows.push({ e, combined, body });
-//   }
-
-//   // 3. Final sort
-//   return rows
-//     .sort((a, b) => b.combined - a.combined)
-//     .slice(0, k)
-//     .map(r => `### ${r.e.chapterTitle}\n${r.body}`)
-//     .join("\n\n---\n\n");
-// }
+/**
+ * HyDE: generate a short hypothetical prose passage that would answer the
+ * query, then embed that instead of the raw query text. Closes the intent gap
+ * between plot-summary language ("when kiyotaka confess") and first-person
+ * prose ("I love you").
+ */
+async function hydeExpand(userMessage: string): Promise<string> {
+  const groq = getGroq();
+  const res = await groq.chat.completions.create({
+    model: GROQ_MODEL,
+    max_tokens: 80,
+    stream: false,
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are a creative writing assistant. Generate a 1-2 sentence prose excerpt from a novel that would directly answer the user's question. Output only the prose, no explanation.",
+      },
+      { role: "user", content: userMessage },
+    ],
+  });
+  return res.choices[0]?.message?.content?.trim() ?? userMessage;
+}
 
 export async function buildManuscriptContextForChat(
-  novelId:      string,
-  entries:      ManuscriptRagRecord[],
-  queryMs:      number[],
-  userMessage:  string,
-  k:            number
+  novelId: string,
+  entries: ManuscriptRagRecord[],
+  userMessage: string,
+  k: number,
 ): Promise<string> {
-  if (entries.length === 0 || queryMs.length === 0) return "";
+  if (entries.length === 0) return "";
 
   const terms = extractQueryKeywords(userMessage);
-  const properNouns = terms.filter(t => t.length >= 4); // Focus on names like Arisu
 
-  // 1. SCORING & ANCHORING
-  const scored = entries.map((e) => {
-    const embScore = cosineSimilarity(queryMs, e.embedding);
-    const lowText = (e.text || "").toLowerCase();
-    
+  // 1. Keyword pre-filter: narrow to chapters likely relevant.
+  //    For small novels (≤10 chapters) search everything.
+  const allSlugs = [...new Set(entries.map((e) => e.chapterSlug))];
+  let candidateSlugs: string[];
+
+  if (allSlugs.length <= 10) {
+    candidateSlugs = allSlugs;
+  } else {
+    const matched = new Set<string>();
+    for (const e of entries) {
+      const lowText = e.text.toLowerCase();
+      if (terms.some((t) => lowText.includes(t))) matched.add(e.chapterSlug);
+    }
+    candidateSlugs = matched.size > 0 ? [...matched] : allSlugs;
+  }
+
+  // 2. Load per-chapter embedding shards in parallel
+  const shardResults = await Promise.all(
+    candidateSlugs.map(async (slug) => ({
+      slug,
+      shards: await getManuscriptEmbShard(novelId, slug),
+    })),
+  );
+
+  // Build lookup: "chapterSlug:chunkIndex" → embedding
+  const embMap = new Map<string, number[]>();
+  for (const { slug, shards } of shardResults) {
+    for (const s of shards) {
+      embMap.set(`${slug}:${s.chunkIndex}`, s.embedding);
+    }
+  }
+
+  const hasEmbeddings = embMap.size > 0;
+
+  // 3. HyDE: expand query to a hypothetical prose passage, then embed it.
+  //    Falls back to keyword-only scoring if OpenRouter is unavailable.
+  let queryEmbedding: number[] = [];
+  if (hasEmbeddings) {
+    try {
+      const hypothesis = await hydeExpand(userMessage);
+      queryEmbedding = await embedTextMs(hypothesis, "search_query");
+    } catch {
+      // HyDE/embedding unavailable — keyword scoring will still work
+    }
+  }
+
+  // 4. Hybrid scoring on candidate entries
+  const candidateEntries = entries.filter((e) => candidateSlugs.includes(e.chapterSlug));
+
+  const scored = candidateEntries.map((e) => {
+    const embedding = embMap.get(`${e.chapterSlug}:${e.chunkIndex}`) ?? [];
+    const embScore =
+      embedding.length > 0 && queryEmbedding.length > 0
+        ? cosineSimilarity(queryEmbedding, embedding)
+        : 0;
+
+    const lowText = e.text.toLowerCase();
     let kwHits = 0;
-    let containsProperNoun = false;
-    for (const t of properNouns) {
-      if (lowText.includes(t)) {
-        kwHits++;
-        containsProperNoun = true;
-      }
+    for (const t of terms) {
+      if (lowText.includes(t)) kwHits++;
     }
 
-    /**
-     * THE VIP LANE:
-     * If "Arisu" is in the text, we give it a 1.0 floor score.
-     * This ensures it is ALWAYS in the top results, even if 
-     * the embedding model thinks it's irrelevant.
-     */
-    const combined = containsProperNoun 
-      ? 1.0 + (kwHits * 0.1) 
-      : embScore + (kwHits * 0.05);
+    // Mild VIP lane: if a proper noun (len ≥ 4) from the query appears in the
+    // chunk, ensure it's never buried below 0.5 even if embeddings are weak.
+    const properNounHit = terms.some((t) => t.length >= 4 && lowText.includes(t));
+    const combined = properNounHit
+      ? Math.max(embScore, 0.5) + kwHits * 0.1
+      : embScore + kwHits * 0.05;
 
     return { e, combined };
   });
 
-  // 2. NO POOL SLICING
-  // Since we have the text in-memory, we can sort the ENTIRE index.
-  // We no longer slice(0, 250) because that's what was killing "Arisu".
-  const top = scored
-    .sort((a, b) => b.combined - a.combined)
-    .slice(0, k);
-
+  // 5. Top-k
+  const top = scored.sort((a, b) => b.combined - a.combined).slice(0, k);
   if (top.length === 0) return "";
 
   return top

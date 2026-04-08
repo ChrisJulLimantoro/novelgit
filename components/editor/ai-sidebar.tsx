@@ -20,7 +20,7 @@ export function AiSidebar({ novelId, open, onClose }: Props) {
   const [streaming, setStreaming]     = useState(false);
   const [streamError, setStreamError] = useState("");
   const [reindexBusy, setReindexBusy] = useState(false);
-  const [reindexNote, setReindexNote] = useState<"ok" | "err" | null>(null);
+  const [reindexNote, setReindexNote] = useState<"ok" | "warn" | "err" | null>(null);
   const [reindexDetail, setReindexDetail] = useState("");
   const bottomRef   = useRef<HTMLDivElement>(null);
   const inputRef    = useRef<HTMLTextAreaElement>(null);
@@ -108,7 +108,7 @@ export function AiSidebar({ novelId, open, onClose }: Props) {
         setReindexDetail(raw.slice(0, 120) || res.statusText);
         return;
       }
-      let data: { reindexed?: number };
+      let data: { reindexed?: number; manuscriptChunks?: number; manuscriptError?: string };
       try {
         data = JSON.parse(raw) as typeof data;
       } catch {
@@ -116,13 +116,23 @@ export function AiSidebar({ novelId, open, onClose }: Props) {
         setReindexDetail("Invalid response");
         return;
       }
-      const lore = data.reindexed ?? 0;
-      setReindexNote("ok");
-      setReindexDetail(
-        lore === 0
-          ? "No lore entries to embed (add lore under Library, or set VOYAGE_API_KEY if embedding failed)."
-          : `${lore} lore ${lore === 1 ? "entry" : "entries"} embedded.`,
-      );
+
+      const lore   = data.reindexed ?? 0;
+      const chunks = data.manuscriptChunks ?? 0;
+      const msErr  = data.manuscriptError;
+
+      const loreLine = lore === 0
+        ? "Lore: none (add entries in Library or set VOYAGE_API_KEY)"
+        : `Lore: ${lore} ${lore === 1 ? "entry" : "entries"} embedded`;
+
+      const msLine = msErr
+        ? `Manuscript: failed — ${msErr.slice(0, 100)}`
+        : chunks === 0
+          ? "Manuscript: 0 chunks (set OPENROUTER_API_KEY)"
+          : `Manuscript: ${chunks} chunks embedded`;
+
+      setReindexNote(msErr ? "warn" : "ok");
+      setReindexDetail(`${loreLine}\n${msLine}`);
     } catch {
       setReindexNote("err");
       setReindexDetail("Network error");
@@ -132,12 +142,11 @@ export function AiSidebar({ novelId, open, onClose }: Props) {
   }
 
   useEffect(() => {
-    if (reindexNote !== "ok") return;
-    const ms = reindexDetail.includes("\n") ? 12000 : 6000;
+    if (reindexNote !== "ok" && reindexNote !== "warn") return;
     const t = setTimeout(() => {
       setReindexNote(null);
       setReindexDetail("");
-    }, ms);
+    }, 12000);
     return () => clearTimeout(t);
   }, [reindexNote, reindexDetail]);
 
@@ -191,8 +200,13 @@ export function AiSidebar({ novelId, open, onClose }: Props) {
             {reindexDetail}
           </p>
         )}
+        {reindexNote === "warn" && (
+          <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-snug whitespace-pre-line break-words">
+            {reindexDetail}
+          </p>
+        )}
         {reindexNote === "err" && (
-          <p className="text-[10px] text-destructive leading-snug">{reindexDetail}</p>
+          <p className="text-[10px] text-destructive leading-snug whitespace-pre-line break-words">{reindexDetail}</p>
         )}
       </div>
 
@@ -204,7 +218,7 @@ export function AiSidebar({ novelId, open, onClose }: Props) {
             <div>
               <p className="text-sm font-medium text-[var(--text-primary)] mb-1">Ask anything about your novel</p>
               <p className="text-xs text-[var(--text-muted)]">
-                Answers use <span className="font-medium text-[var(--text-primary)]">lore</span> after you run <span className="font-medium text-[var(--text-primary)]">Reindex RAG</span> (<span className="font-medium text-[var(--text-primary)]">VOYAGE_API_KEY</span>).
+                Answers use <span className="font-medium text-[var(--text-primary)]">lore</span> and <span className="font-medium text-[var(--text-primary)]">manuscript</span> after you run <span className="font-medium text-[var(--text-primary)]">Reindex RAG</span>.
               </p>
             </div>
             <div className="flex flex-col gap-1.5 mt-2 w-full">
