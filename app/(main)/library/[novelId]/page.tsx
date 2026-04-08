@@ -98,6 +98,41 @@ export default async function NovelPage({
         <NewChapterButton novelId={novelId} />
       </div>
 
+      {chapters.length === 0 ? (
+        <div className="flex flex-col items-center gap-5 py-16 text-center">
+          <BookOpen size={40} className="text-[var(--text-muted)] opacity-30" />
+          <div>
+            <p className="font-serif text-xl text-[var(--text-primary)] mb-1">No chapters yet.</p>
+            <p className="text-sm text-[var(--text-muted)]">Create your first chapter to start writing.</p>
+          </div>
+          <NewChapterButton novelId={novelId} />
+        </div>
+      ) : (
+        <ol className="flex flex-col gap-1">
+          {chapters.map((slug, i) => {
+            const displayTitle = meta.chapterTitles?.[slug] ?? prettySlug(slug);
+            return (
+              <li key={slug}>
+                <Link
+                  href={`/edit/${novelId}/${slug}`}
+                  className="flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-[var(--bg-sidebar)] transition-colors group"
+                >
+                  <span className="font-mono text-xs text-[var(--text-muted)] w-6 shrink-0 select-none">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span className="font-serif text-base text-[var(--text-primary)] capitalize flex-1">
+                    {displayTitle}
+                  </span>
+                  <span className="text-xs text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity">
+                    Edit →
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+
       {/* Lore section */}
       <Separator className="my-8" />
 
@@ -147,43 +182,6 @@ export default async function NovelPage({
             </Link>
           )}
         </div>
-      )}
-
-      <Separator className="my-8" />
-
-      {chapters.length === 0 ? (
-        <div className="flex flex-col items-center gap-5 py-16 text-center">
-          <BookOpen size={40} className="text-[var(--text-muted)] opacity-30" />
-          <div>
-            <p className="font-serif text-xl text-[var(--text-primary)] mb-1">No chapters yet.</p>
-            <p className="text-sm text-[var(--text-muted)]">Create your first chapter to start writing.</p>
-          </div>
-          <NewChapterButton novelId={novelId} />
-        </div>
-      ) : (
-        <ol className="flex flex-col gap-1">
-          {chapters.map((slug, i) => {
-            const displayTitle = meta.chapterTitles?.[slug] ?? prettySlug(slug);
-            return (
-              <li key={slug}>
-                <Link
-                  href={`/edit/${novelId}/${slug}`}
-                  className="flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-[var(--bg-sidebar)] transition-colors group"
-                >
-                  <span className="font-mono text-xs text-[var(--text-muted)] w-6 shrink-0 select-none">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <span className="font-serif text-base text-[var(--text-primary)] capitalize flex-1">
-                    {displayTitle}
-                  </span>
-                  <span className="text-xs text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity">
-                    Edit →
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ol>
       )}
     </div>
   );

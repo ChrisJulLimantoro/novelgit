@@ -17,7 +17,8 @@ export default async function EditorPage({ params }: Props) {
     getFile(`content/${novelId}/meta.json`),
   ]);
 
-  const meta           = JSON.parse(metaFile.content);
+  let meta: { title?: string; chapterOrder?: string[]; chapterTitles?: Record<string, string> } = {};
+  try { meta = JSON.parse(metaFile.content); } catch { /* use empty defaults */ }
   const chapterOrder: string[]               = meta.chapterOrder  ?? [];
   const chapterTitles: Record<string, string> = meta.chapterTitles ?? {};
   const fetchedAt      = new Date().toISOString();

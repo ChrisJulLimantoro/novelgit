@@ -23,6 +23,7 @@ export const LoreIndexRecordSchema = z.object({
   type:      z.enum(LORE_TYPES),
   name:      z.string(),
   tags:      z.array(z.string()).default([]),
+  snippet:   z.string().optional(), // first 300 chars of body, for scoring without a full load
   embedding: z.array(z.number()),
   updatedAt: z.string(),
 });

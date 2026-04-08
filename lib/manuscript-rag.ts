@@ -126,7 +126,11 @@ export async function saveManuscriptEmbShard(
   );
 }
 
-/** Load live chapter text for a stored chunk (skips stale rows). */
+/**
+ * Load live chapter text for a stored chunk.
+ * FOR FRESHNESS CHECKS ONLY — never call this inside a retrieval loop.
+ * Hot-path retrieval uses ManuscriptRagRecord.text which is stored at index time.
+ */
 export async function getManuscriptChunkText(
   novelId: string,
   chapterSlug: string,

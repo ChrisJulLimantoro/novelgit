@@ -10,7 +10,7 @@ const styles = StyleSheet.create({
 
 export async function exportPdf(
   title: string,
-  chapters: { slug: string; content: string }[],
+  chapters: { slug: string; title: string; content: string }[],
 ): Promise<Buffer> {
   const doc = React.createElement(
     Document,
@@ -19,13 +19,13 @@ export async function exportPdf(
       Page,
       { size: "A4", style: styles.page },
       React.createElement(Text, { style: styles.title }, title),
-      ...chapters.map(({ slug, content }) =>
-        React.createElement(
-          View,
-          { key: slug },
-          React.createElement(Text, { style: styles.chapterTitle }, slug.replace(/^\d+-/, "").replace(/-/g, " ")),
-          React.createElement(Text, { style: styles.body }, content.replace(/^#+\s*/gm, "")),
-        ),
+    ),
+    ...chapters.map(({ slug, title: chapterTitle, content }) =>
+      React.createElement(
+        Page,
+        { key: slug, size: "A4", style: styles.page },
+        React.createElement(Text, { style: styles.chapterTitle }, chapterTitle),
+        React.createElement(Text, { style: styles.body }, content.replace(/^#+\s*/gm, "")),
       ),
     ),
   );

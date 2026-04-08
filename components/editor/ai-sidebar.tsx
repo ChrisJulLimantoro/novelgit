@@ -15,10 +15,11 @@ interface Props {
 }
 
 export function AiSidebar({ novelId, open, onClose }: Props) {
-  const [messages, setMessages]       = useState<ChatMessage[]>([]);
-  const [input, setInput]             = useState("");
-  const [streaming, setStreaming]     = useState(false);
-  const [streamError, setStreamError] = useState("");
+  const [messages, setMessages]         = useState<ChatMessage[]>([]);
+  const [streamingContent, setStreamingContent] = useState("");
+  const [input, setInput]               = useState("");
+  const [streaming, setStreaming]       = useState(false);
+  const [streamError, setStreamError]   = useState("");
   const [reindexBusy, setReindexBusy] = useState(false);
   const [reindexNote, setReindexNote] = useState<"ok" | "warn" | "err" | null>(null);
   const [reindexDetail, setReindexDetail] = useState("");
@@ -32,7 +33,7 @@ export function AiSidebar({ novelId, open, onClose }: Props) {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, streamingContent]);
 
   async function sendMessage() {
     const text = input.trim();
@@ -43,20 +44,23 @@ export function AiSidebar({ novelId, open, onClose }: Props) {
 
     const userMsg: ChatMessage = { role: "user", content: text };
     const nextMessages = [...messages, userMsg];
-    setMessages(nextMessages);
 
-    // Add empty assistant message to stream into
-    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
     setStreaming(true);
+    setStreamingContent("");
+    setMessages(nextMessages);
 
     const ctrl = new AbortController();
     abortRef.current = ctrl;
 
+    // Keep last 40 messages so the server's 50-message cap is never hit
+    const window = nextMessages.slice(-40);
+
+    let accumulated = "";
     try {
       const res = await fetch(`/api/ai/${novelId}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ messages: nextMessages }),
+        body:    JSON.stringify({ messages: window }),
         signal:  ctrl.signal,
       });
       if (!res.ok) throw new Error(await res.text());
@@ -67,20 +71,20 @@ export function AiSidebar({ novelId, open, onClose }: Props) {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        setMessages((prev) => {
-          const updated = [...prev];
-          const last = updated[updated.length - 1];
-          if (last.role === "assistant") {
-            updated[updated.length - 1] = { ...last, content: last.content + chunk };
-          }
-          return updated;
-        });
+        accumulated += decoder.decode(value, { stream: true });
+        setStreamingContent(accumulated);
       }
+
+      // Stream complete — move into messages as a completed assistant entry
+      setMessages((prev) => [...prev, { role: "assistant", content: accumulated }]);
+      setStreamingContent("");
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
         setStreamError("Failed to get a response. Try again.");
-        setMessages((prev) => prev.filter((_, i) => i !== prev.length - 1 || prev[i].content !== ""));
+        if (accumulated) {
+          setMessages((prev) => [...prev, { role: "assistant", content: accumulated }]);
+        }
+        setStreamingContent("");
       }
     } finally {
       setStreaming(false);
@@ -234,35 +238,45 @@ export function AiSidebar({ novelId, open, onClose }: Props) {
             </div>
           </div>
         ) : (
-          messages.map((msg, i) => (
-            <div
-              key={i}
-              className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}
-            >
+          <>
+            {messages.map((msg, i) => (
               <div
-                className={cn(
-                  "max-w-[88%] rounded-xl px-3 py-2 text-xs leading-relaxed",
-                  msg.role === "user"
-                    ? "rounded-tr-sm bg-[var(--accent)]/10 text-[var(--text-primary)]"
-                    : "rounded-tl-sm bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)]",
-                )}
+                key={i}
+                className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}
               >
-                {msg.role === "assistant" ? (
-                  <div className="prose prose-xs max-w-none dark:prose-invert text-[var(--text-primary)]">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                    {streaming && i === messages.length - 1 && msg.content === "" && (
-                      <Loader2 size={12} className="animate-spin text-[var(--text-muted)]" />
-                    )}
-                    {streaming && i === messages.length - 1 && msg.content !== "" && (
-                      <span className="inline-block w-1 h-3 bg-[var(--text-muted)] animate-pulse ml-0.5 align-middle" />
-                    )}
-                  </div>
-                ) : (
-                  msg.content
-                )}
+                <div
+                  className={cn(
+                    "max-w-[88%] rounded-xl px-3 py-2 text-xs leading-relaxed",
+                    msg.role === "user"
+                      ? "rounded-tr-sm bg-[var(--accent)]/10 text-[var(--text-primary)]"
+                      : "rounded-tl-sm bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)]",
+                  )}
+                >
+                  {msg.role === "assistant" ? (
+                    <div className="prose prose-xs max-w-none dark:prose-invert text-[var(--text-primary)]">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    msg.content
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            ))}
+            {streaming && (
+              <div className="flex justify-start">
+                <div className="max-w-[88%] rounded-xl rounded-tl-sm px-3 py-2 text-xs leading-relaxed bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)]">
+                  {streamingContent === "" ? (
+                    <Loader2 size={12} className="animate-spin text-[var(--text-muted)]" />
+                  ) : (
+                    <>
+                      <span className="whitespace-pre-wrap">{streamingContent}</span>
+                      <span className="inline-block w-1 h-3 bg-[var(--text-muted)] animate-pulse ml-0.5 align-middle" />
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
         )}
         {streamError && (
           <p className="text-xs text-destructive text-center">{streamError}</p>
@@ -294,9 +308,9 @@ export function AiSidebar({ novelId, open, onClose }: Props) {
             }
           </button>
         </div>
-        {messages.length > 0 && (
+        {(messages.length > 0 || streaming) && (
           <button
-            onClick={() => { setMessages([]); setStreamError(""); }}
+            onClick={() => { setMessages([]); setStreamingContent(""); setStreamError(""); }}
             disabled={streaming}
             className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors self-start flex items-center gap-1 disabled:opacity-40"
           >

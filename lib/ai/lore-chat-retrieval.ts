@@ -5,7 +5,7 @@
 import { cosineSimilarity } from "@/lib/ai/rag";
 import { getLoreEntry } from "@/lib/lore";
 import { extractQueryKeywords } from "@/lib/ai/rag-utils";
-import type { LoreEntry, LoreIndex, LoreIndexRecord } from "@/types/lore";
+import type { LoreEntry, LoreIndex } from "@/types/lore";
 
 export const LORE_CHAT_K = 10;
 
@@ -44,6 +44,10 @@ function keywordHits(textLower: string, terms: string[]): number {
 
 /**
  * Build lore markdown sections for the system prompt.
+ *
+ * Scoring runs entirely from the index (name, tags, snippet, embedding) —
+ * no GitHub reads. Full entry bodies are only fetched for the top-K results
+ * that actually appear in the prompt.
  */
 export async function buildLoreContextForChat(
   novelId:     string,
@@ -55,28 +59,15 @@ export async function buildLoreContextForChat(
   const records = loreIndex.entries;
   if (records.length === 0) return "";
 
-  const loaded = await Promise.all(
-    records.map(async (r) => {
-      try {
-        const entry = await getLoreEntry(novelId, r.id);
-        return { r, entry };
-      } catch {
-        return null;
-      }
-    }),
-  );
-
-  const pairs = loaded.filter(Boolean) as { r: LoreIndexRecord; entry: LoreEntry }[];
-  if (pairs.length === 0) return "";
-
   const terms = extractQueryKeywords(userMessage);
   const hints = extractEntityHints(userMessage);
 
-  const scored = pairs.map(({ r, entry }) => {
-    const nameLow = entry.name.toLowerCase();
-    const tagsLow = entry.tags.map((t) => t.toLowerCase()).join(" ");
-    const bodyLow = entry.body.toLowerCase();
-    const blob    = `${nameLow} ${tagsLow} ${bodyLow}`;
+  // Score every record from the index — no I/O
+  const scored = records.map((r) => {
+    const nameLow     = r.name.toLowerCase();
+    const tagsLow     = r.tags.map((t) => t.toLowerCase()).join(" ");
+    const snippetLow  = (r.snippet ?? "").toLowerCase();
+    const blob        = `${nameLow} ${tagsLow} ${snippetLow}`;
 
     let score = 0;
     if (queryLore.length > 0 && r.embedding.length > 0) {
@@ -91,7 +82,7 @@ export async function buildLoreContextForChat(
         score += 4;
       } else if (tagsLow.includes(h)) {
         score += 2.5;
-      } else if (bodyLow.includes(h)) {
+      } else if (snippetLow.includes(h)) {
         score += 1.2;
       } else if (h.length >= 4) {
         const p = h.slice(0, 4);
@@ -104,13 +95,28 @@ export async function buildLoreContextForChat(
       }
     }
 
-    return { entry, score };
+    return { r, score };
   });
 
   scored.sort((a, b) => b.score - a.score);
-  const top = scored.slice(0, k);
+  const topK = scored.slice(0, k);
 
-  return top
+  // Only fetch full bodies for the entries that will appear in the prompt
+  const withBodies = await Promise.all(
+    topK.map(async ({ r, score }) => {
+      try {
+        const entry = await getLoreEntry(novelId, r.id);
+        return { entry, score };
+      } catch {
+        return null;
+      }
+    }),
+  );
+
+  const results = withBodies.filter(Boolean) as { entry: LoreEntry; score: number }[];
+  if (results.length === 0) return "";
+
+  return results
     .map(({ entry }) => `### ${entry.name} (${entry.type})\n${entry.body}`)
     .join("\n\n---\n\n");
 }

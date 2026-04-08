@@ -51,6 +51,7 @@ export async function POST(
 
     loreIndex.entries = loreIndex.entries.map((rec, i) => ({
       ...rec,
+      snippet:   entries[i]?.body.slice(0, 300) ?? "",
       embedding: embeddings[i] ?? [],
       updatedAt: today,
     }));
@@ -95,20 +96,25 @@ export async function POST(
       const newEntries: ManuscriptRagRecord[] = [];
       const chapterErrors: Record<string, string> = {};
 
-      // Process one chapter at a time to stay within rate limits (20 req/min).
-      for (const slug of slugs) {
-        const title = titles[slug] ?? slug;
-        const result = await reindexSingleChapter(novelId, slug, title);
-
-        if (!result.ok) {
-          chapterErrors[slug] = result.error;
-          // Preserve previously embedded entries for this chapter on any failure
-          newEntries.push(...(existingBySlug.get(slug) ?? []));
-          continue;
+      // Process in batches of 3 to stay safely within the 20 req/min free-tier
+      // rate limit while reducing total wall-clock time vs. strict serial.
+      const BATCH_SIZE = 3;
+      for (let i = 0; i < slugs.length; i += BATCH_SIZE) {
+        const batch = slugs.slice(i, i + BATCH_SIZE);
+        const results = await Promise.all(
+          batch.map((slug) => reindexSingleChapter(novelId, slug, titles[slug] ?? slug)),
+        );
+        for (let j = 0; j < batch.length; j++) {
+          const slug   = batch[j]!;
+          const result = results[j]!;
+          if (!result.ok) {
+            chapterErrors[slug] = result.error;
+            newEntries.push(...(existingBySlug.get(slug) ?? []));
+          } else {
+            newEntries.push(...result.entries);
+            manuscriptChunks += result.chunks;
+          }
         }
-
-        newEntries.push(...result.entries);
-        manuscriptChunks += result.chunks;
       }
 
       // Only write the index if we processed any chapters at all

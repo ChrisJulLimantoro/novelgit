@@ -32,9 +32,9 @@ export async function GET(
     return new Response("Not found", { status: 404 });
   }
 
-  let meta: { title?: string; chapterOrder?: string[] };
+  let meta: { title?: string; chapterOrder?: string[]; chapterTitles?: Record<string, string> };
   try {
-    meta = JSON.parse(metaRaw) as { title?: string; chapterOrder?: string[] };
+    meta = JSON.parse(metaRaw) as { title?: string; chapterOrder?: string[]; chapterTitles?: Record<string, string> };
   } catch {
     return new Response("Invalid meta.json", { status: 500 });
   }
@@ -48,12 +48,22 @@ export async function GET(
     }
   }
 
-  const chapters = await Promise.all(
+  const results = await Promise.allSettled(
     order.map(async (slug) => {
       const { content } = await getFile(`content/${novelId}/manuscript/${slug}.md`);
-      return { slug, content };
+      const title = meta.chapterTitles?.[slug] ?? slug.replace(/^\d+-/, "").replace(/-/g, " ");
+      return { slug, title, content };
     }),
   );
+
+  const missing = results
+    .map((r, i) => ({ r, slug: order[i] }))
+    .filter(({ r }) => r.status === "rejected")
+    .map(({ slug }) => slug);
+  if (missing.length > 0) {
+    return new Response(`Missing chapters: ${missing.join(", ")}`, { status: 422 });
+  }
+  const chapters = (results as PromiseFulfilledResult<{ slug: string; title: string; content: string }>[]).map((r) => r.value);
 
   const title = meta.title ?? novelId;
 

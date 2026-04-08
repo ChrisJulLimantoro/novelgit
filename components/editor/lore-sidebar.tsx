@@ -27,7 +27,6 @@ export function LoreSidebar({ novelId, open, onClose, highlight }: Props) {
   const [isDebounceWaiting, setIsDebounceWaiting] = useState(false);
   const [isSearching, startSearch] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
-  const lastHighlight = useRef<string | undefined>(undefined);
   const searchGeneration = useRef(0);
   const novelIdRef = useRef(novelId);
   novelIdRef.current = novelId;
@@ -45,8 +44,7 @@ export function LoreSidebar({ novelId, open, onClose, highlight }: Props) {
   // When highlight changes (WikiLink click), run a search for that name (no debounce)
   useEffect(() => {
     if (!open) return;
-    if (highlight && highlight !== lastHighlight.current) {
-      lastHighlight.current = highlight;
+    if (highlight) {
       debouncedSearch.cancel();
       searchGeneration.current += 1;
       const gen = searchGeneration.current;
