@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { createChapter } from "@/app/(editor)/edit/[novelId]/[chapterSlug]/actions";
+import { PendingOverlay } from "@/components/ui/pending-overlay";
 
 export function NewChapterButton({ novelId }: { novelId: string }) {
   const [open, setOpen] = useState(false);
@@ -25,13 +26,20 @@ export function NewChapterButton({ novelId }: { novelId: string }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && isPending) return; // block close while creating
+        setOpen(nextOpen);
+      }}
+    >
       <DialogTrigger render={<Button />}>New Chapter</DialogTrigger>
-      <DialogContent aria-labelledby="new-chapter-title">
+      <DialogContent aria-labelledby="new-chapter-title" showCloseButton={!isPending}>
         <DialogHeader>
           <DialogTitle id="new-chapter-title">New Chapter</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmit} className="relative flex flex-col gap-4">
+          {isPending && <PendingOverlay label="Creating chapter…" />}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="chapter-title">Title</Label>
             <Input id="chapter-title" name="title" required placeholder="Chapter One" autoFocus />

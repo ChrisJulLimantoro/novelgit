@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { createNovel } from "@/app/(main)/library/actions";
 import { GENRES } from "@/types/novel";
 import { cn } from "@/lib/utils";
+import { PendingOverlay } from "@/components/ui/pending-overlay";
 
 interface Props {
   triggerSize?: "default" | "lg";
@@ -41,13 +42,20 @@ export function NewNovelDialog({ triggerSize = "default" }: Props) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && isPending) return; // block close while creating
+        handleOpenChange(nextOpen);
+      }}
+    >
       <DialogTrigger render={<Button size={triggerSize} />}>New Novel</DialogTrigger>
-      <DialogContent aria-labelledby="new-novel-title">
+      <DialogContent aria-labelledby="new-novel-title" showCloseButton={!isPending}>
         <DialogHeader>
           <DialogTitle id="new-novel-title">New Novel</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        <form onSubmit={handleSubmit} className="relative flex flex-col gap-5">
+          {isPending && <PendingOverlay label="Creating novel…" />}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="title">Title</Label>
             <Input id="title" name="title" required placeholder="The Void Chronicles" />

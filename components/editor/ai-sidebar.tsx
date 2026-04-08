@@ -7,6 +7,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/types/lore";
+import { useGlobalLoader } from "@/components/ui/global-loader";
 
 interface Props {
   novelId: string;
@@ -26,6 +27,7 @@ export function AiSidebar({ novelId, open, onClose }: Props) {
   const bottomRef   = useRef<HTMLDivElement>(null);
   const inputRef    = useRef<HTMLTextAreaElement>(null);
   const abortRef    = useRef<AbortController | null>(null);
+  const { startLoading, stopLoading } = useGlobalLoader();
 
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 50);
@@ -104,6 +106,7 @@ export function AiSidebar({ novelId, open, onClose }: Props) {
     setReindexBusy(true);
     setReindexNote(null);
     setReindexDetail("");
+    startLoading("Reindexing RAG…", "Embedding lore and manuscript. This may take a minute.");
     try {
       const res = await fetch(`/api/ai/${novelId}/reindex`, { method: "POST" });
       const raw = await res.text();
@@ -141,6 +144,7 @@ export function AiSidebar({ novelId, open, onClose }: Props) {
       setReindexNote("err");
       setReindexDetail("Network error");
     } finally {
+      stopLoading();
       setReindexBusy(false);
     }
   }

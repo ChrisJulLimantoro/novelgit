@@ -18,6 +18,7 @@ import { SyncStatusBanner } from "./sync-status-banner";
 import { EditorToolbar } from "./editor-toolbar";
 import { ChapterReadNav } from "./chapter-read-nav";
 import { cn } from "@/lib/utils";
+import { useGlobalLoader } from "@/components/ui/global-loader";
 
 interface Props {
   novelId:          string;
@@ -41,6 +42,7 @@ export function EditorClient({
   loreSidebarOpen, onToggleLore, aiSidebarOpen, onToggleAi, onWikiLinkClick,
 }: Props) {
   const { resolvedTheme } = useTheme();
+  const { startLoading, stopLoading } = useGlobalLoader();
   const [editMode, setEditMode]       = useState(false); // read-first
   const [syncState, setSyncState]     = useState<SyncState>("idle");
   const [showRestore, setShowRestore] = useState(false);
@@ -152,6 +154,7 @@ export function EditorClient({
     if (syncInFlightRef.current) return;
     syncInFlightRef.current = true;
     setSyncState("syncing");
+    startLoading("Syncing to GitHub…", "Please don't close this page.");
     try {
       await syncChapter(novelId, chapterSlug, latestMd.current);
       clearDraft(novelId, chapterSlug);
@@ -159,9 +162,10 @@ export function EditorClient({
     } catch {
       setSyncState("error");
     } finally {
+      stopLoading();
       syncInFlightRef.current = false;
     }
-  }, [novelId, chapterSlug]);
+  }, [novelId, chapterSlug, startLoading, stopLoading]);
 
   // Keyboard shortcuts
   useEffect(() => {

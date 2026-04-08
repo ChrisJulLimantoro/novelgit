@@ -10,6 +10,7 @@ import { LORE_TYPE_LABELS } from "@/lib/lore-categories";
 import { createLoreEntry, updateLoreEntry } from "@/app/(main)/library/[novelId]/lore/actions";
 import { LORE_TYPES } from "@/types/lore";
 import type { LoreType, LoreEntry } from "@/types/lore";
+import { PendingOverlay } from "@/components/ui/pending-overlay";
 
 interface Props {
   novelId:     string;
@@ -115,7 +116,8 @@ export function LoreEntryForm({ novelId, initial, presetType, onSuccess, onCance
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="relative flex flex-col gap-5">
+      {isPending && <PendingOverlay label={isEdit ? "Saving changes…" : "Saving entry…"} />}
       {/* Name */}
       <div className="flex flex-col gap-1.5">
         <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">

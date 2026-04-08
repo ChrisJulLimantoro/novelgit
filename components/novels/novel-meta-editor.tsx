@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { updateNovel } from "@/app/(main)/library/actions";
 import { GENRES, type Genre } from "@/types/novel";
 import type { Novel } from "@/types/novel";
+import { PendingOverlay } from "@/components/ui/pending-overlay";
 
 const statusOptions: { value: Novel["status"]; label: string }[] = [
   { value: "planning", label: "Planning" },
@@ -61,7 +62,8 @@ export function NovelMetaEditor({ novelId, title, status, genres }: Props) {
   }
 
   return (
-    <div className="border border-[var(--border-default)] rounded-xl p-5 flex flex-col gap-5 bg-[var(--bg-elevated)]">
+    <div className="relative border border-[var(--border-default)] rounded-xl p-5 flex flex-col gap-5 bg-[var(--bg-elevated)]">
+      {isPending && <PendingOverlay label="Saving metadata…" />}
       {/* Title */}
       <div className="flex flex-col gap-1.5">
         <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Title</label>

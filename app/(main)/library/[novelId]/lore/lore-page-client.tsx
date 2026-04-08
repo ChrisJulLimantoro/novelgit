@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useTransition } from "react";
+import { useState, useMemo, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Search, BookOpen, Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { LoreEntryForm } from "@/components/lore/lore-entry-form";
 import { LoreTypeIcon } from "@/components/lore/lore-type-icon";
+import { PendingOverlay } from "@/components/ui/pending-overlay";
 import { getLoreEntryAction, deleteLoreEntryAction, listLoreEntriesAction } from "./actions";
 import {
   LORE_CLUSTERS,
@@ -46,10 +47,22 @@ export function LorePageClient({ novelId, initialEntries, initialEntryId }: Prop
   const [selectedId, setSelectedId] = useState<string | null>(initialEntryId ?? null);
   const [viewMode, setViewMode]     = useState<ViewMode>(initialEntryId ? "detail" : "list");
   const [activeEntry, setActiveEntry] = useState<LoreEntry | null>(null);
-  const [loadingEntry, setLoadingEntry] = useState(false);
+  const [loadingEntry, setLoadingEntry] = useState(!!initialEntryId);
   const [deleteError, setDeleteError] = useState("");
   const [isDeleting, startDelete]  = useTransition();
   const [createPreset, setCreatePreset] = useState<LoreType | null>(null);
+
+  // Fetch the entry that was linked to directly (e.g. from the library novel page)
+  useEffect(() => {
+    if (!initialEntryId) return;
+    setLoadingEntry(true);
+    setActiveEntry(null);
+    getLoreEntryAction(novelId, initialEntryId)
+      .then((entry) => setActiveEntry(entry))
+      .catch(() => setActiveEntry(null))
+      .finally(() => setLoadingEntry(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filtered = useMemo(() => {
     const allowed = typesInCluster(clusterFilter);
@@ -292,10 +305,11 @@ export function LorePageClient({ novelId, initialEntries, initialEntryId }: Prop
 
       {/* ── Right: Detail / Edit / Create ───────────────────── */}
       <div className={cn(
-        "flex-1 min-w-0 rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)]",
+        "relative flex-1 min-w-0 rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)]",
         !showDetail && !showEdit && !showCreate && "hidden md:flex",
         "flex flex-col",
       )}>
+        {isDeleting && <PendingOverlay label="Deleting entry…" />}
 
         {!showDetail && !showEdit && !showCreate && (
           <div className="flex flex-col items-center justify-center gap-4 flex-1 text-center px-8 py-16">

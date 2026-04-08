@@ -10,7 +10,7 @@ import {
   useSortable, arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Plus, Check, X } from "lucide-react";
+import { GripVertical, Plus, Check, X, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { reorderChapters, createChapter, renameChapterTitle } from "@/app/(editor)/edit/[novelId]/[chapterSlug]/actions";
@@ -24,10 +24,11 @@ interface SortableProps {
 
 function SortableChapter({ slug, novelId, isActive, displayTitle }: SortableProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: slug });
-  const [editing, setEditing]   = useState(false);
-  const [draft, setDraft]       = useState(displayTitle);
+  const [editing, setEditing]     = useState(false);
+  const [draft, setDraft]         = useState(displayTitle);
   const [renameError, setRenameError] = useState<string | null>(null);
-  const inputRef                = useRef<HTMLInputElement>(null);
+  const [isRenaming, setIsRenaming]   = useState(false);
+  const inputRef                  = useRef<HTMLInputElement>(null);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -42,11 +43,14 @@ function SortableChapter({ slug, novelId, isActive, displayTitle }: SortableProp
       setEditing(false);
       return;
     }
+    setIsRenaming(true);
     try {
       await renameChapterTitle(novelId, slug, trimmed);
       setEditing(false);
     } catch {
       setRenameError("Could not save. Try again.");
+    } finally {
+      setIsRenaming(false);
     }
   }
 
@@ -86,17 +90,31 @@ function SortableChapter({ slug, novelId, isActive, displayTitle }: SortableProp
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") void commitRename();
-              if (e.key === "Escape") setEditing(false);
+              if (e.key === "Enter" && !isRenaming) void commitRename();
+              if (e.key === "Escape" && !isRenaming) setEditing(false);
             }}
-            className="flex-1 min-w-0 bg-transparent border-b border-[var(--accent)] outline-none text-sm text-[var(--text-primary)] py-0.5"
+            disabled={isRenaming}
+            className="flex-1 min-w-0 bg-transparent border-b border-[var(--accent)] outline-none text-sm text-[var(--text-primary)] py-0.5 disabled:opacity-60"
             autoFocus
           />
           {renameError && (
             <p className="text-[10px] text-destructive shrink-0 max-w-[8rem]">{renameError}</p>
           )}
-          <button type="button" onClick={() => void commitRename()} className="text-[var(--status-writing)] shrink-0"><Check size={12} /></button>
-          <button onClick={() => setEditing(false)} className="text-[var(--text-muted)] shrink-0"><X size={12} /></button>
+          <button
+            type="button"
+            onClick={() => void commitRename()}
+            disabled={isRenaming}
+            className="text-[var(--status-writing)] shrink-0 disabled:opacity-40"
+          >
+            {isRenaming ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+          </button>
+          <button
+            onClick={() => setEditing(false)}
+            disabled={isRenaming}
+            className="text-[var(--text-muted)] shrink-0 disabled:opacity-40"
+          >
+            <X size={12} />
+          </button>
         </div>
       ) : (
         /* Normal row */
@@ -125,10 +143,12 @@ export function ChapterSidebar({
   novelId, chapterOrder: initial, chapterTitles, activeSlug, open, onClose,
 }: Props) {
   const [chapters, setChapters]     = useState(initial);
-  const [creating, setCreating]     = useState(false);
-  const [newTitle, setNewTitle]     = useState("");
+  const [creating, setCreating]       = useState(false);
+  const [isCommitting, setIsCommitting] = useState(false);
+  const [newTitle, setNewTitle]       = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
-  const newInputRef                 = useRef<HTMLInputElement>(null);
+  const [reorderError, setReorderError] = useState<string | null>(null);
+  const newInputRef                   = useRef<HTMLInputElement>(null);
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor));
 
   useEffect(() => {
@@ -143,11 +163,12 @@ export function ChapterSidebar({
     const prev = chapters;
     const reordered = arrayMove(chapters, oldIndex, newIndex);
     setChapters(reordered);
+    setReorderError(null);
     try {
       await reorderChapters(novelId, reordered);
     } catch {
       setChapters(prev);
-      console.warn("Reorder failed; list reverted.");
+      setReorderError("Reorder failed — order reverted.");
     }
   }
 
@@ -159,6 +180,7 @@ export function ChapterSidebar({
       setCreating(false);
       return;
     }
+    setIsCommitting(true);
     try {
       const slug = await createChapter(novelId, title);
       setChapters((p) => [...p, slug]);
@@ -166,6 +188,8 @@ export function ChapterSidebar({
       setCreating(false);
     } catch {
       setCreateError("Could not create chapter.");
+    } finally {
+      setIsCommitting(false);
     }
   }
 
@@ -250,18 +274,48 @@ export function ChapterSidebar({
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") void commitNewChapter();
-                if (e.key === "Escape") { setCreating(false); setNewTitle(""); setCreateError(null); }
+                if (e.key === "Enter" && !isCommitting) void commitNewChapter();
+                if (e.key === "Escape" && !isCommitting) { setCreating(false); setNewTitle(""); setCreateError(null); }
               }}
+              disabled={isCommitting}
               placeholder="Chapter title…"
-              className="flex-1 min-w-0 bg-transparent border-b border-[var(--accent)] outline-none text-sm text-[var(--text-primary)] py-0.5 placeholder:text-[var(--text-muted)]"
+              className="flex-1 min-w-0 bg-transparent border-b border-[var(--accent)] outline-none text-sm text-[var(--text-primary)] py-0.5 placeholder:text-[var(--text-muted)] disabled:opacity-60"
             />
-            <button type="button" onClick={() => void commitNewChapter()} aria-label="Confirm" className="text-[var(--status-writing)] shrink-0"><Check size={12} /></button>
-            <button type="button" onClick={() => { setCreating(false); setNewTitle(""); setCreateError(null); }} aria-label="Cancel" className="text-[var(--text-muted)] shrink-0"><X size={12} /></button>
+            <button
+              type="button"
+              onClick={() => void commitNewChapter()}
+              disabled={isCommitting}
+              aria-label="Confirm"
+              className="text-[var(--status-writing)] shrink-0 disabled:opacity-40"
+            >
+              {isCommitting ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setCreating(false); setNewTitle(""); setCreateError(null); }}
+              disabled={isCommitting}
+              aria-label="Cancel"
+              className="text-[var(--text-muted)] shrink-0 disabled:opacity-40"
+            >
+              <X size={12} />
+            </button>
           </div>
           {createError && (
             <p className="text-[10px] text-destructive mt-1">{createError}</p>
           )}
+        </div>
+      )}
+
+      {reorderError && (
+        <div className="px-3 py-2 border-t border-[var(--border-default)] shrink-0 flex items-center justify-between gap-2">
+          <p className="text-[10px] text-destructive">{reorderError}</p>
+          <button
+            type="button"
+            onClick={() => setReorderError(null)}
+            className="text-[var(--text-muted)] hover:text-[var(--text-primary)] shrink-0"
+          >
+            <X size={10} />
+          </button>
         </div>
       )}
 
