@@ -10,7 +10,7 @@ export function TopNav({ breadcrumb }: TopNavProps) {
     <nav
       role="navigation"
       aria-label="Main navigation"
-      className="h-[var(--nav-height)] border-b border-[var(--border-default)] flex items-center px-6 gap-4 bg-[var(--bg-elevated)]"
+      className="h-[var(--nav-height)] border-b border-[var(--border-default)] flex items-center px-4 sm:px-6 gap-4 bg-[var(--bg-elevated)]"
     >
       <Link href="/library" className="font-serif font-semibold text-lg shrink-0">
         NovelGit

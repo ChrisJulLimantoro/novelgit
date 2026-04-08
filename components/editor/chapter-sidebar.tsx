@@ -77,7 +77,7 @@ function SortableChapter({ slug, novelId, isActive, displayTitle }: SortableProp
         {...attributes}
         {...listeners}
         aria-label={`Reorder ${displayTitle}`}
-        className="text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-grab shrink-0 touch-none"
+        className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-grab shrink-0 touch-none"
       >
         <GripVertical size={13} />
       </button>
@@ -211,7 +211,7 @@ export function ChapterSidebar({
         "flex flex-col bg-[var(--bg-sidebar)] border-r border-[var(--border-default)] overflow-y-auto shrink-0",
         "transition-transform duration-200",
         // Mobile: fixed overlay drawer
-        "fixed inset-y-0 left-0 z-40 w-72",
+        "fixed inset-y-0 left-0 z-40 w-[min(18rem,85vw)]",
         // Desktop: in-flow, toggled via hidden
         "md:relative md:w-[var(--sidebar-width)] md:z-auto",
         open

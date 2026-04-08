@@ -67,7 +67,7 @@ export function ChapterSection({ novelId, chapters, chapterTitles }: Props) {
                     <span className="font-mono text-xs text-[var(--text-muted)] w-6 shrink-0 select-none">
                       {String(i + 1).padStart(2, "0")}
                     </span>
-                    <span className="font-serif text-base text-[var(--text-primary)] capitalize flex-1">
+                    <span className="font-serif text-base text-[var(--text-primary)] capitalize flex-1 truncate">
                       {displayTitle}
                     </span>
                     <span className="text-xs text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity">

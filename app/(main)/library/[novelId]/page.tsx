@@ -47,7 +47,7 @@ export default async function NovelPage({
   const lorePreview = loreIndex.entries.slice(0, 5).map(({ id, type, name }) => ({ id, type, name }));
 
   return (
-    <div className="max-w-[800px] mx-auto px-6 py-10">
+    <div className="max-w-[800px] mx-auto px-4 sm:px-6 py-8 sm:py-10">
       {/* Back */}
       <Link
         href="/library"
@@ -58,7 +58,7 @@ export default async function NovelPage({
       </Link>
 
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 mb-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4 mb-3">
         <h1 className="font-serif text-4xl font-semibold text-[var(--text-primary)] leading-tight">
           {novel.title}
         </h1>
@@ -80,7 +80,7 @@ export default async function NovelPage({
       )}
 
       {/* Inline metadata editor + export */}
-      <div className="mb-8 flex items-center gap-5">
+      <div className="mb-8 flex flex-wrap items-center gap-3 sm:gap-5">
         <NovelMetaEditor
           novelId={novelId}
           title={novel.title}

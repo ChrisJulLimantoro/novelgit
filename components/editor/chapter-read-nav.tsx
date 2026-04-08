@@ -49,7 +49,7 @@ export function ChapterReadNav({
 
       {showIndex && (
         <span
-          className="hidden sm:inline font-mono text-xs text-[var(--text-muted)] tabular-nums px-1 select-none min-w-[4.5rem] text-center"
+          className="font-mono text-xs text-[var(--text-muted)] tabular-nums px-1 select-none min-w-[2.5rem] sm:min-w-[4.5rem] text-center"
           aria-live="polite"
         >
           {idx + 1} / {chapterOrder.length}

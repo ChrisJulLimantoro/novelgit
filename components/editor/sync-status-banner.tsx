@@ -24,7 +24,8 @@ export function SyncStatusBanner({ state, onRetry }: Props) {
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-0 inset-x-0 z-30 h-10 flex items-center justify-center text-sm
+      className="fixed bottom-0 inset-x-0 z-30 flex items-center justify-center text-sm
+                 min-h-10 pb-[env(safe-area-inset-bottom,0px)]
                  bg-[var(--bg-elevated)] border-t border-[var(--border-default)]
                  animate-[slideUp_200ms_ease-out]"
     >

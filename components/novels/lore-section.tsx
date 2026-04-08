@@ -77,7 +77,7 @@ export function LoreSection({ novelId, entries, totalCount }: Props) {
                 className="flex items-center gap-2.5 px-4 py-2.5 rounded-lg hover:bg-[var(--bg-sidebar)] transition-colors group"
               >
                 <LoreTypeIcon type={entry.type} size={13} className="text-[var(--text-muted)] shrink-0" />
-                <span className="text-sm text-[var(--text-primary)] flex-1 capitalize">{entry.name}</span>
+                <span className="text-sm text-[var(--text-primary)] flex-1 capitalize truncate">{entry.name}</span>
                 <span className="text-[10px] text-[var(--text-muted)] capitalize opacity-0 group-hover:opacity-100 transition-opacity">
                   {entry.type}
                 </span>

@@ -166,7 +166,7 @@ export function LorePageClient({ novelId, initialEntries, initialEntryId }: Prop
   const showCreate  = viewMode === "create";
 
   return (
-    <div className="flex gap-6 min-h-[60vh]">
+    <div className="flex gap-0 md:gap-6 min-h-[60vh]">
       {/* ── Left: clustered list ───────────────────────────── */}
       <div className={cn(
         "flex flex-col gap-4 shrink-0",
@@ -328,7 +328,7 @@ export function LorePageClient({ novelId, initialEntries, initialEntryId }: Prop
         )}
 
         {showCreate && (
-          <div className="p-6 overflow-y-auto">
+          <div className="p-4 sm:p-6 overflow-y-auto">
             <h2 className="font-serif text-xl font-semibold text-[var(--text-primary)] mb-1">
               {createPreset ? `New ${LORE_TYPE_LABELS[createPreset]}` : "New lore entry"}
             </h2>
@@ -351,7 +351,7 @@ export function LorePageClient({ novelId, initialEntries, initialEntryId }: Prop
         )}
 
         {showEdit && activeEntry && (
-          <div className="p-6 overflow-y-auto">
+          <div className="p-4 sm:p-6 overflow-y-auto">
             <h2 className="font-serif text-xl font-semibold text-[var(--text-primary)] mb-6">Edit entry</h2>
             <LoreEntryForm
               novelId={novelId}
@@ -381,7 +381,7 @@ export function LorePageClient({ novelId, initialEntries, initialEntryId }: Prop
               </div>
             ) : activeEntry ? (
               <div className="flex flex-col flex-1 overflow-hidden">
-                <div className="flex items-start justify-between gap-4 px-6 pt-5 pb-4 border-b border-[var(--border-default)]">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 px-4 sm:px-6 pt-4 sm:pt-5 pb-4 border-b border-[var(--border-default)]">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <LoreTypeIcon type={activeEntry.type} size={16} className="text-[var(--accent)] shrink-0 mt-0.5" />
                     <div className="min-w-0">

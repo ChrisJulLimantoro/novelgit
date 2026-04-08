@@ -59,7 +59,7 @@ function Btn({
       disabled={disabled}
       title={title}
       className={cn(
-        "p-1.5 rounded-md transition-colors",
+        "p-2 md:p-1.5 rounded-md transition-colors",
         active
           ? "bg-[var(--accent)]/10 text-[var(--accent)]"
           : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-sidebar)]",
@@ -123,7 +123,7 @@ export function EditorToolbar({
               if (v === "p") editor.chain().focus().setParagraph().run();
               else editor.chain().focus().setHeading({ level: Number(v[1]) as 1 | 2 | 3 }).run();
             }}
-            className="text-xs border border-[var(--border-default)] rounded-md px-2 py-1 bg-[var(--bg-elevated)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+            className="text-xs border border-[var(--border-default)] rounded-md px-2 py-2 md:py-1 bg-[var(--bg-elevated)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] cursor-pointer"
           >
             <option value="p">Normal</option>
             <option value="h1">Heading 1</option>
@@ -135,20 +135,23 @@ export function EditorToolbar({
 
           <Btn onClick={() => editor.chain().focus().toggleBold().run()}      active={editor.isActive("bold")}        title="Bold (⌘B)"><Bold size={14} /></Btn>
           <Btn onClick={() => editor.chain().focus().toggleItalic().run()}    active={editor.isActive("italic")}      title="Italic (⌘I)"><Italic size={14} /></Btn>
-          <Btn onClick={() => editor.chain().focus().toggleStrike().run()}    active={editor.isActive("strike")}      title="Strikethrough"><Strikethrough size={14} /></Btn>
 
-          <Sep />
-
-          <Btn onClick={() => editor.chain().focus().toggleBulletList().run()}  active={editor.isActive("bulletList")}  title="Bullet list"><List size={14} /></Btn>
-          <Btn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive("orderedList")} title="Numbered list"><ListOrdered size={14} /></Btn>
-          <Btn onClick={() => editor.chain().focus().toggleBlockquote().run()}  active={editor.isActive("blockquote")}  title="Blockquote"><Quote size={14} /></Btn>
+          {/* Advanced formatting — hidden on mobile */}
+          <div className="hidden md:flex items-center gap-0.5">
+            <Btn onClick={() => editor.chain().focus().toggleStrike().run()}    active={editor.isActive("strike")}      title="Strikethrough"><Strikethrough size={14} /></Btn>
+            <Sep />
+            <Btn onClick={() => editor.chain().focus().toggleBulletList().run()}  active={editor.isActive("bulletList")}  title="Bullet list"><List size={14} /></Btn>
+            <Btn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive("orderedList")} title="Numbered list"><ListOrdered size={14} /></Btn>
+            <Btn onClick={() => editor.chain().focus().toggleBlockquote().run()}  active={editor.isActive("blockquote")}  title="Blockquote"><Quote size={14} /></Btn>
+          </div>
         </>
       )}
 
       {/* Right side */}
       <div className="ml-auto flex items-center gap-2 shrink-0 pl-2">
-        <span className="font-mono text-xs text-[var(--text-muted)] hidden sm:inline select-none">
-          {words.toLocaleString()} words
+        <span className="font-mono text-xs text-[var(--text-muted)] select-none">
+          <span className="sm:hidden">{words.toLocaleString()}w</span>
+          <span className="hidden sm:inline">{words.toLocaleString()} words</span>
         </span>
 
         <Sep />
@@ -182,7 +185,7 @@ export function EditorToolbar({
               title={title}
               onClick={() => onReadingThemeChange(value)}
               className={cn(
-                "w-4 h-4 rounded-full border transition-all shrink-0",
+                "w-6 h-6 md:w-4 md:h-4 rounded-full border transition-all shrink-0 touch-manipulation",
                 readingTheme === value
                   ? "ring-2 ring-offset-1 ring-[var(--accent)] border-[var(--accent)]"
                   : "border-[var(--border-default)] hover:border-[var(--text-muted)]",

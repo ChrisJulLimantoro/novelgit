@@ -48,6 +48,15 @@ export function EditorShell({
         />
       )}
 
+      {/* Mobile backdrop — closes right panel */}
+      {rightPanel !== null && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40 md:hidden"
+          onClick={() => setRightPanel(null)}
+          aria-hidden="true"
+        />
+      )}
+
       <ChapterSidebar
         novelId={novelId}
         chapterOrder={chapterOrder}

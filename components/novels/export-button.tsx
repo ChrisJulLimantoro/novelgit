@@ -59,7 +59,7 @@ export function ExportButton({ novelId, novelTitle }: Props) {
         <>
           {/* Click-outside dismiss */}
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-6 z-20 flex flex-col overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--bg-elevated)] shadow-lg min-w-[140px]">
+          <div className="absolute right-0 top-6 z-20 flex flex-col overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--bg-elevated)] shadow-lg min-w-[140px]">
             <button
               type="button"
               onClick={() => void handleExport("pdf")}
@@ -87,7 +87,7 @@ export function ExportButton({ novelId, novelTitle }: Props) {
       )}
 
       {error && (
-        <div className="absolute left-0 top-6 z-20 flex items-start gap-2 rounded-lg border border-destructive/40 bg-[var(--bg-elevated)] px-3 py-2.5 shadow-lg max-w-[240px]">
+        <div className="absolute right-0 top-6 z-20 flex items-start gap-2 rounded-lg border border-destructive/40 bg-[var(--bg-elevated)] px-3 py-2.5 shadow-lg max-w-[240px]">
           <p className="text-xs text-destructive flex-1">{error}</p>
           <button onClick={() => setError("")} className="shrink-0 text-[var(--text-muted)] hover:text-[var(--text-primary)]">
             <X size={11} />

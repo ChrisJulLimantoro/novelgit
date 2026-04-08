@@ -224,7 +224,7 @@ export function EditorClient({
       >
         <div
           className={cn(
-            "max-w-[var(--editor-max-width)] mx-auto px-6 sm:px-8",
+            "max-w-[var(--editor-max-width)] mx-auto px-3 sm:px-6 md:px-8",
             !editMode && chapterOrder.length > 0
               ? "pt-16 pb-[max(7rem,calc(env(safe-area-inset-bottom,0px)+5.5rem))] sm:pb-32"
               : "py-16",

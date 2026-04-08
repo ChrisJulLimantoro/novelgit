@@ -49,7 +49,7 @@ export function GlobalLoaderProvider({ children }: { children: React.ReactNode }
           aria-label={state.label}
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm"
         >
-          <div className="flex flex-col items-center gap-4 rounded-2xl border border-[var(--border-default)] bg-[var(--bg-elevated)] px-10 py-7 shadow-2xl min-w-[220px]">
+          <div className="flex flex-col items-center gap-4 rounded-2xl border border-[var(--border-default)] bg-[var(--bg-elevated)] px-6 sm:px-10 py-7 shadow-2xl min-w-[180px] sm:min-w-[220px]">
             <Loader2 size={30} className="animate-spin text-[var(--accent)]" />
             <div className="text-center">
               <p className="text-sm font-semibold text-[var(--text-primary)]">{state.label}</p>

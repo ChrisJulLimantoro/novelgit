@@ -97,7 +97,7 @@ export function LoreSidebar({ novelId, open, onClose, highlight }: Props) {
   if (!open) return null;
 
   return (
-    <div className="flex flex-col w-[300px] shrink-0 border-l border-[var(--border-default)] bg-[var(--bg-sidebar)] overflow-hidden">
+    <div className="fixed inset-y-0 right-0 z-40 flex flex-col w-full sm:w-80 border-l border-[var(--border-default)] bg-[var(--bg-sidebar)] overflow-hidden md:relative md:inset-auto md:z-auto md:w-[300px] md:shrink-0">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-default)] shrink-0">
         <span className="text-sm font-semibold text-[var(--text-primary)]">Lore</span>
@@ -146,7 +146,7 @@ export function LoreSidebar({ novelId, open, onClose, highlight }: Props) {
             </div>
             <div className="px-4 py-3 flex-1">
               {selected.body ? (
-                <div className="prose prose-xs max-w-none dark:prose-invert text-[var(--text-primary)]">
+                <div className="prose prose-xs max-w-none dark:prose-invert text-[var(--text-primary)] overflow-x-auto">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{selected.body}</ReactMarkdown>
                 </div>
               ) : (

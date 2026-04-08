@@ -84,7 +84,7 @@ export function NovelMetaEditor({ novelId, title, status, genres }: Props) {
               type="button"
               onClick={() => setDraftStatus(opt.value)}
               className={cn(
-                "px-3 py-1 rounded-full text-xs border transition-all duration-150",
+                "px-3 py-2 md:py-1 rounded-full text-xs border transition-all duration-150",
                 draftStatus === opt.value
                   ? "bg-[var(--accent)]/10 border-[var(--accent)] text-[var(--accent)] font-medium"
                   : "border-[var(--border-default)] text-[var(--text-muted)] hover:border-[var(--accent)]/50",
@@ -111,7 +111,7 @@ export function NovelMetaEditor({ novelId, title, status, genres }: Props) {
                 onClick={() => toggleGenre(g)}
                 aria-pressed={active}
                 className={cn(
-                  "px-3 py-1 rounded-full text-xs border transition-all duration-150 select-none",
+                  "px-3 py-2 md:py-1 rounded-full text-xs border transition-all duration-150 select-none",
                   active
                     ? "bg-[var(--accent)]/10 border-[var(--accent)] text-[var(--accent)] font-medium"
                     : "border-[var(--border-default)] text-[var(--text-muted)] hover:border-[var(--accent)]/50 hover:text-[var(--text-primary)]",

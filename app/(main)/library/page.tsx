@@ -74,8 +74,8 @@ async function LibraryGrid() {
 
 export default function LibraryPage() {
   return (
-    <div className="max-w-[1200px] mx-auto px-6 py-10">
-      <div className="flex items-center justify-between mb-8">
+    <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-8 sm:py-10">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-8">
         <h1 className="font-serif text-3xl font-semibold">Library</h1>
         <NewNovelDialog />
       </div>
