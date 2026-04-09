@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,7 +34,14 @@ export function NewChapterButton({ novelId }: { novelId: string }) {
         setOpen(nextOpen);
       }}
     >
-      <DialogTrigger render={<Button />}>New Chapter</DialogTrigger>
+      <DialogTrigger
+        render={
+          <Button size="sm" variant="outline" />
+        }
+      >
+        <Plus size={13} />
+        New Chapter
+      </DialogTrigger>
       <DialogContent aria-labelledby="new-chapter-title" showCloseButton={!isPending}>
         <DialogHeader>
           <DialogTitle id="new-chapter-title">New Chapter</DialogTitle>

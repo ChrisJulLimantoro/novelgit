@@ -32,6 +32,8 @@ interface Props {
   onToggleLore:     () => void;
   aiSidebarOpen:    boolean;
   onToggleAi:       () => void;
+  bibleSidebarOpen: boolean;
+  onToggleBible:    () => void;
   onWikiLinkClick:  (name: string) => void;
 }
 
@@ -39,7 +41,7 @@ type SyncState = "idle" | "syncing" | "success" | "error";
 
 export function EditorClient({
   novelId, chapterSlug, chapterOrder, initialContent, fetchedAt, sidebarOpen, onToggleSidebar,
-  loreSidebarOpen, onToggleLore, aiSidebarOpen, onToggleAi, onWikiLinkClick,
+  loreSidebarOpen, onToggleLore, aiSidebarOpen, onToggleAi, bibleSidebarOpen, onToggleBible, onWikiLinkClick,
 }: Props) {
   const { resolvedTheme } = useTheme();
   const { startLoading, stopLoading } = useGlobalLoader();
@@ -204,6 +206,8 @@ export function EditorClient({
         onToggleLore={onToggleLore}
         aiSidebarOpen={aiSidebarOpen}
         onToggleAi={onToggleAi}
+        bibleSidebarOpen={bibleSidebarOpen}
+        onToggleBible={onToggleBible}
       />
 
       {/* Scrollable document area */}

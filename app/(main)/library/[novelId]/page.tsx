@@ -8,8 +8,10 @@ import { NovelMetaEditor } from "@/components/novels/novel-meta-editor";
 import { ExportButton } from "@/components/novels/export-button";
 import { ChapterSection } from "@/components/novels/chapter-section";
 import { LoreSection } from "@/components/novels/lore-section";
+import { GlobalBibleSection } from "@/components/novels/global-bible-section";
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft } from "lucide-react";
+import { getGlobalBible } from "@/lib/manuscript-rag";
 
 interface Meta {
   id:             string;
@@ -45,6 +47,8 @@ export default async function NovelPage({
 
   const loreIndex = await getLoreIndex(novelId);
   const lorePreview = loreIndex.entries.slice(0, 5).map(({ id, type, name }) => ({ id, type, name }));
+
+  const globalBible = await getGlobalBible(novelId).catch(() => "");
 
   return (
     <div className="max-w-[800px] mx-auto px-4 sm:px-6 py-8 sm:py-10">
@@ -91,6 +95,11 @@ export default async function NovelPage({
       </div>
 
       <Separator className="mb-8" />
+
+      {/* Global Bible — story overview, always at top */}
+      <GlobalBibleSection novelId={novelId} initialBible={globalBible} />
+
+      <Separator className="my-8" />
 
       <ChapterSection
         novelId={novelId}

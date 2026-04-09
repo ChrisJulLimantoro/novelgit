@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Settings } from "lucide-react";
 import { DarkModeToggle } from "./dark-mode-toggle";
 
 interface TopNavProps {
@@ -32,6 +33,13 @@ export function TopNav({ breadcrumb }: TopNavProps) {
         </ol>
       )}
       <div className="ml-auto flex items-center gap-2">
+        <Link
+          href="/admin"
+          title="AI Settings"
+          className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-sidebar)] transition-colors"
+        >
+          <Settings size={15} />
+        </Link>
         <DarkModeToggle />
       </div>
     </nav>

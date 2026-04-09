@@ -5,8 +5,9 @@ import { ChapterSidebar } from "./chapter-sidebar";
 import { EditorClient } from "./editor-client";
 import { LoreSidebar } from "./lore-sidebar";
 import { AiSidebar } from "./ai-sidebar";
+import { GlobalBibleSidebar } from "./global-bible-sidebar";
 
-type RightPanel = "lore" | "ai" | null;
+type RightPanel = "lore" | "ai" | "bible" | null;
 
 interface Props {
   novelId:        string;
@@ -35,6 +36,10 @@ export function EditorShell({
 
   function toggleAi() {
     setRightPanel((p) => (p === "ai" ? null : "ai"));
+  }
+
+  function toggleBible() {
+    setRightPanel((p) => (p === "bible" ? null : "bible"));
   }
 
   return (
@@ -78,6 +83,8 @@ export function EditorShell({
         onToggleLore={toggleLore}
         aiSidebarOpen={rightPanel === "ai"}
         onToggleAi={toggleAi}
+        bibleSidebarOpen={rightPanel === "bible"}
+        onToggleBible={toggleBible}
         onWikiLinkClick={handleWikiLinkClick}
       />
 
@@ -93,6 +100,13 @@ export function EditorShell({
       <AiSidebar
         novelId={novelId}
         open={rightPanel === "ai"}
+        onClose={() => setRightPanel(null)}
+      />
+
+      {/* Right panel — Global Bible */}
+      <GlobalBibleSidebar
+        novelId={novelId}
+        open={rightPanel === "bible"}
         onClose={() => setRightPanel(null)}
       />
     </div>

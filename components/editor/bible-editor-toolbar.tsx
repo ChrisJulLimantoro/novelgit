@@ -5,44 +5,35 @@ import { useEditorState } from "@tiptap/react";
 import {
   Bold, Italic, Strikethrough,
   List, ListOrdered, Quote,
-  GitBranch, Eye, Pencil, PanelLeftOpen, PanelLeftClose,
-  BookOpen, Sparkles, BookMarked,
+  GitBranch, Eye, Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FontSize, ReadingTheme } from "@/lib/reader-prefs";
 
-type SyncState = "idle" | "syncing" | "success" | "error";
+type SaveState = "idle" | "saving" | "success" | "error";
 
 interface Props {
-  editor:              Editor;
-  editMode:            boolean;
-  onToggleEdit:        () => void;
-  syncState:           SyncState;
-  onSync:              () => void;
-  sidebarOpen:         boolean;
-  onToggleSidebar:     () => void;
-  fontSize:            FontSize;
-  onFontSizeChange:    (s: FontSize) => void;
-  readingTheme:        ReadingTheme;
-  onReadingThemeChange:(t: ReadingTheme) => void;
-  resolvedTheme:       "light" | "dark";
-  loreSidebarOpen:     boolean;
-  onToggleLore:        () => void;
-  aiSidebarOpen:       boolean;
-  onToggleAi:          () => void;
-  bibleSidebarOpen:    boolean;
-  onToggleBible:       () => void;
+  editor:               Editor;
+  editMode:             boolean;
+  onToggleEdit:         () => void;
+  saveState:            SaveState;
+  onSave:               () => void;
+  fontSize:             FontSize;
+  onFontSizeChange:     (s: FontSize) => void;
+  readingTheme:         ReadingTheme;
+  onReadingThemeChange: (t: ReadingTheme) => void;
+  resolvedTheme:        "light" | "dark";
 }
 
 const FONT_SIZES: FontSize[] = ["sm", "md", "lg", "xl"];
 
 const LIGHT_THEMES: { value: ReadingTheme; bg: string; title: string }[] = [
-  { value: "default", bg: "#ffffff",  title: "Default" },
-  { value: "sepia",   bg: "#f5efe0",  title: "Sepia"   },
+  { value: "default", bg: "#ffffff", title: "Default" },
+  { value: "sepia",   bg: "#f5efe0", title: "Sepia"   },
 ];
 const DARK_THEMES: { value: ReadingTheme; bg: string; title: string }[] = [
-  { value: "default", bg: "#3e2b1a",  title: "Default" },
-  { value: "warm",    bg: "#241509",  title: "Warm"    },
+  { value: "default", bg: "#3e2b1a", title: "Default" },
+  { value: "warm",    bg: "#241509", title: "Warm"    },
 ];
 
 function Btn({
@@ -77,17 +68,15 @@ function Sep() {
   return <div className="w-px h-5 bg-[var(--border-default)] mx-0.5 shrink-0" />;
 }
 
-export function EditorToolbar({
-  editor, editMode, onToggleEdit, syncState, onSync, sidebarOpen, onToggleSidebar,
+export function BibleEditorToolbar({
+  editor, editMode, onToggleEdit, saveState, onSave,
   fontSize, onFontSizeChange, readingTheme, onReadingThemeChange, resolvedTheme,
-  loreSidebarOpen, onToggleLore, aiSidebarOpen, onToggleAi, bibleSidebarOpen, onToggleBible,
 }: Props) {
   const themes = resolvedTheme === "dark" ? DARK_THEMES : LIGHT_THEMES;
 
   const words = useEditorState({
     editor,
-    selector: ({ editor: ed }) =>
-      ed.storage.characterCount?.words() ?? 0,
+    selector: ({ editor: ed }) => ed.storage.characterCount?.words() ?? 0,
   });
 
   const headingValue =
@@ -99,13 +88,6 @@ export function EditorToolbar({
 
   return (
     <div className="flex items-center gap-0.5 px-3 py-1.5 border-b border-[var(--border-default)] bg-[var(--bg-elevated)] overflow-x-auto shrink-0">
-
-      {/* Sidebar toggle */}
-      <Btn onClick={onToggleSidebar} title={sidebarOpen ? "Hide chapters" : "Show chapters"}>
-        {sidebarOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
-      </Btn>
-
-      <Sep />
 
       {/* Read / Edit toggle */}
       <Btn onClick={onToggleEdit} active={editMode} title={editMode ? "Read mode (⌘⇧R)" : "Edit mode (⌘⇧R)"}>
@@ -135,10 +117,9 @@ export function EditorToolbar({
 
           <Sep />
 
-          <Btn onClick={() => editor.chain().focus().toggleBold().run()}      active={editor.isActive("bold")}        title="Bold (⌘B)"><Bold size={14} /></Btn>
-          <Btn onClick={() => editor.chain().focus().toggleItalic().run()}    active={editor.isActive("italic")}      title="Italic (⌘I)"><Italic size={14} /></Btn>
+          <Btn onClick={() => editor.chain().focus().toggleBold().run()}   active={editor.isActive("bold")}   title="Bold (⌘B)"><Bold size={14} /></Btn>
+          <Btn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} title="Italic (⌘I)"><Italic size={14} /></Btn>
 
-          {/* Advanced formatting — hidden on mobile */}
           <div className="hidden md:flex items-center gap-0.5">
             <Btn onClick={() => editor.chain().focus().toggleStrike().run()}    active={editor.isActive("strike")}      title="Strikethrough"><Strikethrough size={14} /></Btn>
             <Sep />
@@ -199,27 +180,15 @@ export function EditorToolbar({
 
         <Sep />
 
-        {/* Lore + AI + Global Bible toggles */}
-        <Btn onClick={onToggleLore} active={loreSidebarOpen} title="Lore">
-          <BookOpen size={15} />
-        </Btn>
-        <Btn onClick={onToggleAi} active={aiSidebarOpen} title="Ask AI">
-          <Sparkles size={15} />
-        </Btn>
-        <Btn onClick={onToggleBible} active={bibleSidebarOpen} title="Global Bible">
-          <BookMarked size={15} />
-        </Btn>
-
-        <Sep />
-
         <button
-          onClick={onSync}
-          disabled={syncState === "syncing"}
+          type="button"
+          onClick={onSave}
+          disabled={saveState === "saving"}
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[var(--accent)] text-white text-xs hover:bg-[var(--accent-hover)] disabled:opacity-50 transition-colors"
         >
           <GitBranch size={12} />
           <span className="hidden sm:inline">
-            {syncState === "syncing" ? "Syncing…" : "Sync"}
+            {saveState === "saving" ? "Saving…" : saveState === "success" ? "Saved" : "Save"}
           </span>
         </button>
       </div>

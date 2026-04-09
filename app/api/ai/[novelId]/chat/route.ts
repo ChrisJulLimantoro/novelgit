@@ -3,7 +3,7 @@ import { isValidAuthCookie } from "@/lib/auth";
 import { assertSafeNovelId } from "@/lib/ids";
 import { getGroq, GROQ_MODEL } from "@/lib/ai/client";
 import { getLoreIndex } from "@/lib/lore";
-import { getManuscriptRagIndex } from "@/lib/manuscript-rag";
+import { getManuscriptRagIndex, getGlobalBible } from "@/lib/manuscript-rag";
 import { getFile } from "@/lib/github-content";
 import {
   buildLoreContextForChat,
@@ -49,6 +49,10 @@ export async function POST(
     novelTitle = meta.title ?? novelId;
   } catch { /* use novelId as fallback */ }
 
+  // — Global Bible (always injected when present) —
+  let globalBible = "";
+  try { globalBible = await getGlobalBible(novelId); } catch { /* best-effort */ }
+
   // — Lore RAG context —
   let loreContext = "";
   try {
@@ -93,6 +97,9 @@ export async function POST(
 
   // Build system prompt
   const contextSections: string[] = [];
+  if (globalBible) {
+    contextSections.push(`## Story So Far (Global Bible)\n${globalBible}`);
+  }
   if (loreContext) {
     contextSections.push(`## World-building (lore)\n${loreContext}`);
   }

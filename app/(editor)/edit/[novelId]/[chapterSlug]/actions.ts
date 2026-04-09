@@ -8,8 +8,11 @@ import { assertSafeChapterSlug, assertSafeNovelId } from "@/lib/ids";
 import {
   getManuscriptRagIndex,
   updateManuscriptRagIndex,
+  getGlobalBible,
+  updateGlobalBible,
 } from "@/lib/manuscript-rag";
 import { reindexSingleChapter } from "@/lib/ai/manuscript-reindex";
+import { patchGlobalBible } from "@/lib/ai/global-bible";
 import { todayISO } from "@/lib/utils";
 import { parseNovelMeta } from "@/lib/novel-meta";
 
@@ -147,6 +150,21 @@ export async function reindexChapter(
   const index = await getManuscriptRagIndex(novelId);
   const otherEntries = index.entries.filter((e) => e.chapterSlug !== chapterSlug);
   await updateManuscriptRagIndex(novelId, { entries: [...otherEntries, ...result.entries] });
+
+  // Patch Global Bible with this chapter's updated summary (non-fatal)
+  if (process.env.GEMINI_API_KEY && result.summary) {
+    try {
+      const existing = await getGlobalBible(novelId);
+      const patched  = await patchGlobalBible(existing, {
+        chapterTitle: title,
+        summary:      result.summary,
+        tags:         result.tags,
+      });
+      if (patched) await updateGlobalBible(novelId, patched);
+    } catch (e) {
+      console.error("[reindexChapter] global bible patch failed (non-fatal)", String(e));
+    }
+  }
 
   return { ok: true, chunks: result.chunks };
 }

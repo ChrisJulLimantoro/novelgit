@@ -1,78 +1,98 @@
-# NovelGit — AI-powered Novel Management
+# NovelGit — AI-powered novel management
 
-> Write freely. Your manuscripts live as plain Markdown in your own GitHub repository, version-controlled and readable in any editor. AI is layered on top — free to use, optional, and easy to turn off.
+> Write freely. Your manuscripts live as plain Markdown in your own GitHub repository, version-controlled and readable in any editor. NovelGit layers a full **novel management** experience on top: library, rich editing, analytics, export, structured lore, **Global Bible** (story-wide AI summary), and **dual RAG** AI chat that pulls lore, manuscript text, and the Global Bible together. AI is optional and degrades gracefully when keys are missing.
 
 ## What it is
 
-NovelGit is a self-hosted web app for managing long-form fiction. It gives you a library, a rich editor (TipTap + GitHub sync), analytics, PDF/DOCX export, a structured world-bible (lore), and an AI chat assistant that knows both your lore notes **and** the actual text of your manuscript.
+NovelGit is a self-hosted web app for long-form fiction. It gives you a **library**, a **TipTap** editor with GitHub sync, **analytics**, **PDF/DOCX export**, a per-novel **lore / world-bible** (`content/{novelId}/lore/`), a **Global Bible** (`content/{novelId}/global-summary.md`) maintained from chapter-level AI distillation, and an **AI chat** that can use lore entries, manuscript chunks, and the Global Bible at once.
 
-Everything is free to run:
-- **GitHub** (free tier) stores all your content as plain `.md` files
-- **Groq** (free tier) powers the LLM — scaffold lore entries and chat
-- **OpenRouter** (free model) embeds manuscript chunks for semantic search
-- **Voyage** (optional, paid) embeds lore entries for richer semantic search — degrades gracefully to keyword matching without it
+Everything can be run on free tiers where noted:
+
+- **GitHub** (free tier) stores content as plain `.md` and JSON
+- **Groq** (free tier) powers the chat LLM and HyDE-style query expansion for manuscript search
+- **OpenRouter** (free model) embeds manuscript chunks for semantic search (default embedding stack)
+- **Voyage** (optional, paid) embeds lore entries (default stack); without it, lore retrieval falls back to keyword-style matching
+- **Google Gemini** (optional; free tier limits apply) powers **chapter distillation**, **Global Bible** generation/patching, optional **Gemini Embedding** mode for reindexing, and configurable model IDs via **Admin → AI Settings**
 
 ---
 
 ## Features
 
 - **Library** — list and manage novels; scaffold `content/<id>/…` in the content repo
-- **Editor** — TipTap (Markdown), debounced local drafts, GitHub sync, drag-and-drop chapter order, read/edit modes, floating prev/next chapter bar
-- **Lore / world-bible** — per-novel entries stored as `content/<novelId>/lore/*.md` with AI scaffold (generate a template from a name + type) and semantic search
-- **AI Chat** — ask anything about your novel; retrieves relevant lore entries and manuscript excerpts simultaneously, combines both to answer
+- **Editor** — TipTap (Markdown), debounced drafts, GitHub sync, drag-and-drop chapter order, read/edit modes, floating prev/next chapter navigation
+- **Lore / world-bible** — per-novel entries under `content/<novelId>/lore/*.md` with AI scaffold and semantic search (when embeddings exist)
+- **Global Bible** — AI-built running overview (plot, characters, threads) stored as `content/<novelId>/global-summary.md`, updated on reindex from per-chapter summaries; editable at `/edit/<novelId>/bible`
+- **AI chat** — retrieves lore and manuscript excerpts together; **injects the Global Bible** when present; combines sources for answers
+- **Admin — AI Settings** (`/admin`) — edit models and **embedding provider**; settings persist as `ai-config.json` in the **content** repository
 - **Analytics** — calendar heatmap of daily word counts
-- **Export** — combined manuscript as PDF or DOCX, in chapter order
-- **Auth** — single-user passphrase; session cookie; all writing routes protected
+- **Export** — combined manuscript as PDF or DOCX in chapter order
+- **Auth** — single-user passphrase; opaque session cookie; writing, admin, and export routes protected
 
 ---
 
 ## AI & RAG
 
-The AI assistant uses **Retrieval-Augmented Generation**: before calling the LLM it fetches the most relevant lore entries and manuscript excerpts and injects them into the system prompt.
+The assistant uses **retrieval-augmented generation**: relevant lore, manuscript excerpts, and (when available) the Global Bible are injected into the system prompt before the LLM runs.
 
 ### Lore RAG
 
-Lore entries are short structured files (character, location, faction, event, item). Each entry is embedded via **Voyage AI** (`voyage-3`, 1024 dimensions) and stored in `content/{novelId}/lore-index.json`. At chat time the query is embedded and scored against all entries using cosine similarity + keyword + entity-hint bonuses ("who is X" patterns).
+Structured lore files (character, location, faction, event, item) are embedded and stored in `content/{novelId}/lore-index.json`.
 
-Requires `VOYAGE_API_KEY`. Without it, lore retrieval falls back to name/tag keyword matching.
+- **Default (`embeddingProvider: "current"` in `ai-config.json`)** — **Voyage** `voyage-3` (1024-d) via HTTPS REST. Requires `VOYAGE_API_KEY`. Without it, lore side degrades to keyword / heuristic matching.
+- **Optional** — **Gemini Embedding** when `embeddingProvider` is set to `"gemini"` in Admin; reindex uses [`lib/ai/embeddings-gemini.ts`](lib/ai/embeddings-gemini.ts) and `GEMINI_API_KEY`. A **full reindex** is required after switching providers.
 
 ### Manuscript RAG
 
-Chapters are split into overlapping 400-character chunks (1-paragraph overlap so adjacent-paragraph attribution is preserved). Each chunk is embedded via **OpenRouter** (`nvidia/llama-nemotron-embed-vl-1b-v2:free`, 2048 dimensions) and stored in per-chapter shard files at `content/{novelId}/manuscript-rag-emb/{chapterSlug}.json`. Metadata (text, chapter title, chunk index) is stored separately in `manuscript-rag-index.json`.
+Chapters are split into overlapping **400-character** chunks (one-paragraph overlap). Per-chapter embedding shards live at `content/{novelId}/manuscript-rag-emb/{chapterSlug}.json`; metadata (and optional sharded index) in `manuscript-rag-index.json` (and `manuscript-rag-index-*.json` when sharded).
 
-At chat time:
-1. **HyDE** — Groq generates a short hypothetical prose passage that would answer the query (bridges plot-summary language like "when kiyotaka confess" to first-person prose like "I love you")
-2. The hypothesis is embedded and used for cosine similarity search
-3. Hybrid scoring: embedding similarity + keyword hits + proper-noun VIP lane
-4. Top 6 chunks returned
+- **Default** — **OpenRouter** `nvidia/llama-nemotron-embed-vl-1b-v2:free` (2048-d). Requires `OPENROUTER_API_KEY`.
+- **Optional** — same `embeddingProvider: "gemini"` path as lore, using Gemini Embedding for shard builds.
 
-Requires `OPENROUTER_API_KEY`. Free — no credit card needed.
+At chat time for manuscript retrieval:
 
-### How retrieval works
+1. **HyDE** — Groq generates a short hypothetical prose passage that matches the user’s intent
+2. That text is embedded (default: OpenRouter) and scored against chunks with cosine similarity plus keyword and entity-style boosts
+3. Top chunks are returned (see [`lib/ai/manuscript-chat-retrieval.ts`](lib/ai/manuscript-chat-retrieval.ts))
 
-Both lore and manuscript context are **always retrieved simultaneously** and passed to the LLM together. The LLM combines both sources to answer. Neither source "wins" — the model decides how to weight them.
+Keep **`embeddingProvider` on `current`** unless you intentionally standardize on Gemini embeddings for your indexes and understand the implications for query-time embedding alignment.
+
+### Global Bible & chapter distillation
+
+On **reindex**, each chapter can be **distilled** (summary, entities, tags) via **Gemini** ([`lib/ai/chapter-distillation.ts`](lib/ai/chapter-distillation.ts)). Summaries feed **Global Bible** generation or incremental patching ([`lib/ai/global-bible.ts`](lib/ai/global-bible.ts)). Model IDs come from `ai-config.json` (`distillationModel`, `bibleRebuildModel`, `biblePatchModel`). If `GEMINI_API_KEY` is unset, distillation and Global Bible generation are skipped.
+
+### How retrieval works in chat
+
+[`app/api/ai/[novelId]/chat/route.ts`](app/api/ai/[novelId]/chat/route.ts) loads the Global Bible (if present), then lore context, then manuscript context. The model sees all sections together.
 
 ### Citation behaviour
 
-- **Character / world-building questions** ("who is arisu", "what is class A's goal") — the LLM answers from both lore and manuscript context but does not surface chapter names or locations.
-- **Scene / location questions** ("when does arisu confess", "which chapter does the swimming competition happen") — the LLM cites the chapter title.
+- **Character / world-building** questions — answers draw on context; chapter names are not emphasized unless asked.
+- **Scene / “which chapter”** questions — the model is instructed to cite **chapter titles** when referring to specific manuscript moments.
 
-### Reindex RAG
+### Reindex
 
-After writing or editing content, hit **Reindex RAG** in the editor AI sidebar to rebuild embeddings. You can also call `reindexChapter(novelId, slug)` from the editor to reindex a single chapter cheaply (1 API call to OpenRouter) without rebuilding everything.
+Use **Reindex RAG** from the editor AI sidebar or the reindex API. Modes include full rebuild (lore embed, manuscript embed, distillation, Global Bible) and lighter paths. After changing **embedding provider** in Admin, run a **full** reindex so indexes match configuration.
+
+---
+
+## AI configuration
+
+- **Environment** — API keys in `.env.local` (see below).
+- **Runtime settings** — `/admin` reads and writes **`ai-config.json`** at the root of the **GitHub content repo** (not this app repo). Schema: [`types/ai-config.ts`](types/ai-config.ts) (`distillationModel`, `bibleRebuildModel`, `biblePatchModel`, `embeddingProvider`, `geminiEmbeddingModel`).
 
 ---
 
 ## Stack
 
 - **Next.js 16** (App Router), React 19, TypeScript
-- **Tailwind CSS v4**, shadcn/ui-style components
-- **Octokit** — GitHub Contents API for all content reads/writes
+- **Tailwind CSS v4**, shadcn-style UI components
+- **Octokit** — GitHub Contents API for reads/writes
 - **TipTap** + `tiptap-markdown`, `@dnd-kit`, `@nivo/calendar`, `@react-pdf/renderer`, `docx`
-- **Groq SDK** (`llama-3.3-70b-versatile`) — LLM for scaffold + chat + HyDE query expansion
-- **Voyage HTTP API** — lore embeddings (no `voyageai` npm SDK)
-- **OpenRouter HTTP API** — manuscript embeddings (no SDK)
-- **gray-matter** — lore frontmatter parsing
+- **Groq** — chat completions and HyDE expansion
+- **Voyage** — lore embeddings (REST, no `voyageai` SDK)
+- **OpenRouter** — manuscript embeddings (REST)
+- **Gemini (Google AI)** — REST for distillation, Global Bible, and optional embeddings ([`lib/ai/gemini.ts`](lib/ai/gemini.ts), [`lib/ai/embeddings-gemini.ts`](lib/ai/embeddings-gemini.ts))
+- **gray-matter** — lore frontmatter
 
 ---
 
@@ -81,28 +101,25 @@ After writing or editing content, hit **Reindex RAG** in the editor AI sidebar t
 ### Step 1: Prerequisites
 
 - Node.js 20+
-- A **GitHub account** (free)
-- A **Groq account** for a free API key — [console.groq.com](https://console.groq.com)
-- An **OpenRouter account** for a free API key — [openrouter.ai/keys](https://openrouter.ai/keys)
-- *(Optional)* A **Voyage AI account** for lore embeddings — [voyageai.com](https://www.voyageai.com)
+- A **GitHub** account (free)
+- **Groq** — [console.groq.com](https://console.groq.com) (chat + HyDE)
+- **OpenRouter** — [openrouter.ai/keys](https://openrouter.ai/keys) (default manuscript embeddings)
+- *(Optional)* **Voyage** — [voyageai.com](https://www.voyageai.com) (default lore embeddings)
+- *(Optional)* **Google AI Studio** — Gemini API key for distillation, Global Bible, and optional Gemini embeddings
 
 ### Step 2: Create the content repository
 
-Create a **new private GitHub repository** (e.g. `my-novels-content`). This repo stores all your manuscripts and config — not the app code.
-
-Seed it with two files:
+Create a **private** GitHub repository for manuscripts (not the app code). Seed:
 
 **`config/novels.json`**
+
 ```json
 { "novels": [] }
 ```
 
-**`content/.gitkeep`**
-```
-(empty file)
-```
+**`content/.gitkeep`** — empty file
 
-Then create a **Personal Access Token** with `Contents: Read and Write` + `Metadata: Read` permission scoped to this repository. Save the token — you'll need it in Step 4.
+Create a **Personal Access Token** with **Contents: Read and Write** and **Metadata: Read** for this repository.
 
 ### Step 3: Clone and install
 
@@ -114,22 +131,23 @@ npm install
 
 ### Step 4: Configure environment
 
-Copy `.env.example` to `.env.local` and fill in your values:
-
 ```bash
 cp .env.example .env.local
 ```
 
 ```env
 # Required
-GITHUB_TOKEN=ghp_...          # PAT from Step 2
-GITHUB_REPO=owner/repo        # e.g. myuser/my-novels-content
-AUTH_SECRET=your-passphrase   # anything you'll remember; used to log in
+GITHUB_TOKEN=ghp_...
+GITHUB_REPO=owner/repo
+AUTH_SECRET=your-passphrase
 
-# AI — all optional but recommended
-GROQ_API_KEY=gsk_...          # Groq free tier (LLM + HyDE)
-OPENROUTER_API_KEY=sk-or-...  # OpenRouter free tier (manuscript embeddings)
-VOYAGE_API_KEY=pa-...         # Voyage (lore embeddings — paid, optional)
+# AI — recommended for full experience
+GROQ_API_KEY=gsk_...
+OPENROUTER_API_KEY=sk-or-...
+VOYAGE_API_KEY=pa-...
+
+# Optional — distillation, Global Bible, optional Gemini embeddings
+GEMINI_API_KEY=
 ```
 
 ### Step 5: Run
@@ -138,51 +156,58 @@ VOYAGE_API_KEY=pa-...         # Voyage (lore embeddings — paid, optional)
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Scroll past the hero and enter your passphrase to unlock the library and editor.
+Open [http://localhost:3000](http://localhost:3000). Enter your passphrase after the hero to unlock the library, editor, and admin.
 
 ---
 
 ## Environment variables
 
 | Variable | Required | Purpose |
-|---|---|---|
-| `GITHUB_TOKEN` | Yes | PAT for the content repository (`contents: read/write`, `metadata: read`) |
+|----------|----------|---------|
+| `GITHUB_TOKEN` | Yes | PAT for the content repo (`contents: read/write`, `metadata: read`) |
 | `GITHUB_REPO` | Yes | `owner/repo` of the content store |
 | `AUTH_SECRET` | Yes | Passphrase used to mint session cookies |
-| `GROQ_API_KEY` | Recommended | LLM for scaffold, chat, and HyDE query expansion (free tier) |
-| `OPENROUTER_API_KEY` | Recommended | Manuscript chunk embeddings — `nvidia/llama-nemotron-embed-vl-1b-v2:free` (free, no credit card) |
-| `VOYAGE_API_KEY` | Optional | Lore entry embeddings — `voyage-3` via REST (paid, degrades to keyword search without it) |
+| `GROQ_API_KEY` | Recommended | LLM for chat and HyDE expansion |
+| `OPENROUTER_API_KEY` | Recommended | Default manuscript chunk embeddings |
+| `VOYAGE_API_KEY` | Optional | Default lore embeddings; keyword fallback without |
+| `GEMINI_API_KEY` | Optional | Chapter distillation, Global Bible, optional Gemini embedding reindex |
 
-Core writing and library features work with only the three required variables. AI features degrade gracefully when optional keys are absent.
+Core writing features work with only the three required variables. AI features degrade gracefully when optional keys are absent.
 
 ---
 
 ## Scripts
 
 | Command | Description |
-|---|---|
-| `npm run dev` | Next.js dev server |
+|---------|-------------|
+| `npm run dev` | Next.js dev server (raises Node old-space limit for the bundler) |
 | `npm run build` | Production build |
-| `npm run start` | Run production server |
+| `npm run start` | Production server |
 | `npm run lint` | ESLint |
 
 ---
 
 ## Deploying
 
-Deploy on [Vercel](https://vercel.com/) or any Node host that supports Next.js. Set all environment variables in the project settings. The app commits content via the GitHub API — allow for rate limits when syncing many chapters.
+Deploy on [Vercel](https://vercel.com/) or any Node host that supports Next.js. Set environment variables in project settings. The app commits via the GitHub API — allow for rate limits when syncing many chapters.
 
-`GET /api/health` calls `octokit.rest.repos.get` — use it to verify token and repo name after deployment.
+`GET /api/health` uses `octokit.rest.repos.get` — use it to verify token and repo after deployment.
 
 ---
 
 ## Documentation
 
 | Doc | Contents |
-|---|---|
+|-----|----------|
 | [docs/design-docs.md](docs/design-docs.md) | Architecture, content schema, data flow |
 | [docs/spec/ai-rag-plan.md](docs/spec/ai-rag-plan.md) | Lore + RAG + AI routes (original spec) |
 | [docs/nextjs-coding-guide.md](docs/nextjs-coding-guide.md) | Next.js 16 / React 19 conventions |
 | [docs/ui-ux.md](docs/ui-ux.md) | UI stack and component patterns |
 
-This project targets **Next.js 16** — see `node_modules/next/dist/docs/` for APIs that may differ from older versions.
+This project targets **Next.js 16** — see `node_modules/next/dist/docs/` for framework APIs.
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
