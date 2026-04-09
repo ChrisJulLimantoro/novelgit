@@ -9,16 +9,16 @@ import { NOVELGIT_GITHUB_URL } from "@/lib/site";
 
 const panels = [
   {
-    label: "git commit",
-    text: "Every save is a commit. Your entire writing history, browsable on GitHub.",
+    label: "dual RAG",
+    text: "Every chat query retrieves lore entries and manuscript chapters together — no context left behind.",
   },
   {
-    label: "~/library",
-    text: "Organize multiple novels in one repository. Switch between projects instantly.",
+    label: "global bible",
+    text: "AI builds a running story overview — plot, characters, open threads — rebuilt from per-chapter summaries.",
   },
   {
-    label: "status: writing",
-    text: "Track where each novel lives in your process — from planning to complete.",
+    label: "hyde · semantic search",
+    text: "Your question expands into a prose hypothesis before embedding search. Finds scenes by meaning, not keywords.",
   },
 ];
 
@@ -132,7 +132,7 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
               className="font-mono text-xs text-[var(--text-muted)] mb-6 tracking-wider uppercase"
               variants={itemVariants}
             >
-              git-backed · markdown-native · yours
+              ai-powered · git-backed · dual-rag
             </motion.p>
 
             <motion.h1
@@ -150,15 +150,17 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
                 Write novels.
               </span>
               <br />
-              <span className="text-[var(--text-primary)]">Never lose a word.</span>
+              <span className="text-[var(--text-primary)]">With AI that knows your story.</span>
             </motion.h1>
 
             <motion.p
               className="text-lg text-[var(--text-muted)] leading-relaxed mb-10 max-w-xl"
               variants={itemVariants}
             >
-              NovelGit keeps your manuscript in a private GitHub repository — so every
-              revision is saved, every draft recoverable, and your story is always yours.
+              NovelGit is an AI-powered novel management system. Your manuscript lives in
+              a private GitHub repository — every revision version-controlled. The AI reads
+              your lore bible, Global Bible, and full manuscript to answer anything about
+              your story.
             </motion.p>
 
             <motion.div variants={itemVariants} className="flex flex-wrap items-center gap-3">

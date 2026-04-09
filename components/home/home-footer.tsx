@@ -8,7 +8,7 @@ export function HomeFooter() {
     >
       <span className="font-mono text-xs text-[var(--text-muted)]">{copyrightLine()}</span>
       <span className="font-serif text-xs text-[var(--text-muted)] text-center sm:text-right">
-        Your words, your repository.
+        AI-powered writing. Your words, your repository.
       </span>
     </footer>
   );
