@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { ChevronDown, BookMarked, Pencil, Loader2, Sparkles, RefreshCw } from "lucide-react";
+import { ChevronDown, BookMarked, Pencil, Loader2, Sparkles, RefreshCw, NotebookPen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { loadGlobalBible } from "@/app/(main)/library/[novelId]/actions";
 
 type ReindexState  = "idle" | "busy" | "ok" | "warn" | "err";
-type ActiveReindex = "full" | "bible" | null;
+type ActiveReindex = "full" | "bible" | "distill" | null;
 
 interface Props {
   novelId:      string;
@@ -25,7 +25,7 @@ export function GlobalBibleSection({ novelId, initialBible }: Props) {
   const [reindexNote,   setReindexNote]   = useState("");
   const [, startTransition]               = useTransition();
 
-  async function runReindex(mode: "full" | "bible") {
+  async function runReindex(mode: "full" | "bible" | "distill") {
     if (reindexState === "busy") return;
     setReindexState("busy");
     setActiveReindex(mode);
@@ -42,23 +42,43 @@ export function GlobalBibleSection({ novelId, initialBible }: Props) {
           manuscriptChunks?: number;
           manuscriptError?: string;
           globalBibleGenerated?: boolean;
+          distilled?: number;
+          distillErrors?: Record<string, string>;
           error?: string;
         };
         if (data.error) {
           next = "err";
           setReindexNote(data.error.slice(0, 120));
+        } else if (mode === "distill" && data.distillErrors && Object.keys(data.distillErrors).length > 0) {
+          next = "warn";
+          setReindexNote(
+            `Some chapters failed — distilled ${data.distilled ?? 0} · check server logs`,
+          );
         } else if (data.manuscriptError) {
           next = "warn";
           setReindexNote(`Partial error — lore: ${data.reindexed ?? 0}`);
         } else {
           next = "ok";
-          setReindexNote(
-            mode === "bible"
-              ? "Bible rebuilt"
-              : `Done — lore: ${data.reindexed ?? 0} · chunks: ${data.manuscriptChunks ?? 0}`,
-          );
+          if (mode === "bible") {
+            setReindexNote("Bible rebuilt");
+          } else if (mode === "distill") {
+            const n = data.distilled ?? 0;
+            const bibleOk = data.globalBibleGenerated;
+            setReindexNote(
+              bibleOk
+                ? `Done — ${n} chapter${n === 1 ? "" : "s"} resummarized · Global Bible updated`
+                : `Summaries updated (${n}) — Global Bible skipped`,
+            );
+          } else {
+            setReindexNote(`Done — lore: ${data.reindexed ?? 0} · chunks: ${data.manuscriptChunks ?? 0}`);
+          }
         }
-        if (next === "ok") {
+        const shouldRefreshBible =
+          !data.error &&
+          (mode === "bible" ||
+            mode === "distill" ||
+            (mode === "full" && !data.manuscriptError));
+        if (shouldRefreshBible) {
           startTransition(async () => {
             const fresh = await loadGlobalBible(novelId).catch(() => bible);
             setBible(fresh);
@@ -122,6 +142,30 @@ export function GlobalBibleSection({ novelId, initialBible }: Props) {
               : <RefreshCw size={13} />
             }
             {reindexState === "busy" && activeReindex === "bible" ? "Rebuilding…" : "Rebuild Bible"}
+          </Button>
+
+          {/* Resummarize all chapters + Global Bible — no re-embedding */}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => void runReindex("distill")}
+            disabled={reindexState === "busy"}
+            title="Re-run Gemini on every chapter and rebuild the Global Bible. Does not re-embed vectors."
+            className={cn(
+              "text-[0.8rem] font-medium",
+              reindexState === "ok"   && activeReindex === null && "border-emerald-500/40 text-emerald-600 dark:text-emerald-400",
+              reindexState === "warn" && activeReindex === null && "border-amber-500/40 text-amber-600 dark:text-amber-400",
+              reindexState === "err"  && activeReindex === null && "border-destructive/40 text-destructive",
+              (reindexState === "idle" || activeReindex !== null) &&
+                "text-[var(--text-muted)] hover:text-[var(--text-primary)]",
+            )}
+          >
+            {reindexState === "busy" && activeReindex === "distill"
+              ? <Loader2 size={13} className="animate-spin" />
+              : <NotebookPen size={13} />
+            }
+            {reindexState === "busy" && activeReindex === "distill" ? "Resummarizing…" : "Resummarize all"}
           </Button>
 
           {/* Full Reindex — expensive: re-embeds all chapters + distills + bible */}
